@@ -1,0 +1,18 @@
+{
+  "files.exclude": {
+    "**/.godot": true,
+    "**/.import": true
+  },
+  "files.watcherExclude": {
+    "**/.godot/**": true
+  },
+  "search.exclude": {
+    "**/.godot": true
+  },
+  "editor.insertSpaces": false,
+  "editor.tabSize": 4,
+  "editor.formatOnSave": false,
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "godotTools.editorPath.godot4": "c:\\Users\\Jakob\\Downloads\\Godot_v4.6.2-stable_win64.exe\\Godot_v4.6.2-stable_win64.exe"
+}

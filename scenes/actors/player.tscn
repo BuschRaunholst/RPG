@@ -1,0 +1,85 @@
+[gd_scene load_steps=7 format=3 uid="uid://c5i4qf4ktd63l"]
+
+[ext_resource type="Script" path="res://scripts/actors/player.gd" id="1_7f4w2"]
+[ext_resource type="SpriteFrames" path="res://assets/art/characters/player_human_base_4dir_64_frames.tres" id="2_base"]
+[ext_resource type="SpriteFrames" path="res://assets/art/characters/player_clothes_village_tunic_4dir_64_frames.tres" id="3_tunic"]
+[ext_resource type="SpriteFrames" path="res://assets/art/characters/player_boots_worn_4dir_64_frames.tres" id="4_boots"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_7f4w2"]
+radius = 12.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_t6m8v"]
+radius = 28.0
+
+[node name="Player" type="CharacterBody2D"]
+script = ExtResource("1_7f4w2")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_7f4w2")
+
+[node name="Body" type="AnimatedSprite2D" parent="."]
+position = Vector2(0, -18)
+sprite_frames = ExtResource("2_base")
+animation = &"idle_down"
+
+[node name="ClothingLayer" type="AnimatedSprite2D" parent="."]
+position = Vector2(0, -18)
+sprite_frames = ExtResource("3_tunic")
+animation = &"idle_down"
+
+[node name="BootsLayer" type="AnimatedSprite2D" parent="."]
+position = Vector2(0, -18)
+sprite_frames = ExtResource("4_boots")
+animation = &"idle_down"
+
+[node name="LeftArmPivot" type="Node2D" parent="."]
+visible = false
+position = Vector2(8, -12)
+
+[node name="LeftArmSprite" type="Sprite2D" parent="LeftArmPivot"]
+centered = false
+offset = Vector2(-3, 0)
+
+[node name="ShieldSocket" type="Node2D" parent="LeftArmPivot"]
+position = Vector2(0, 16)
+
+[node name="ShieldPivot" type="Node2D" parent="LeftArmPivot/ShieldSocket"]
+
+[node name="ShieldSprite" type="Sprite2D" parent="LeftArmPivot/ShieldSocket/ShieldPivot"]
+z_index = 2
+centered = false
+offset = Vector2(-7, -8)
+
+[node name="BackShieldPivot" type="Node2D" parent="."]
+visible = false
+z_index = -1
+
+[node name="BackShieldSprite" type="Sprite2D" parent="BackShieldPivot"]
+centered = false
+offset = Vector2(-8, -9)
+
+[node name="RightArmPivot" type="Node2D" parent="."]
+visible = false
+position = Vector2(8, -12)
+
+[node name="RightArmSprite" type="Sprite2D" parent="RightArmPivot"]
+centered = false
+offset = Vector2(-3, 0)
+
+[node name="WeaponSocket" type="Node2D" parent="RightArmPivot"]
+position = Vector2(0, 17)
+
+[node name="WeaponPivot" type="Node2D" parent="RightArmPivot/WeaponSocket"]
+
+[node name="WeaponSprite" type="Sprite2D" parent="RightArmPivot/WeaponSocket/WeaponPivot"]
+z_index = 1
+centered = false
+offset = Vector2(-3, -7)
+
+[node name="InteractionDetector" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionDetector"]
+shape = SubResource("CircleShape2D_t6m8v")
+
+[connection signal="area_entered" from="InteractionDetector" to="." method="_on_interaction_detector_area_entered"]
+[connection signal="area_exited" from="InteractionDetector" to="." method="_on_interaction_detector_area_exited"]

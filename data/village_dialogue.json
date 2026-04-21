@@ -1,0 +1,244 @@
+{
+  "elder_rowan": {
+    "not_started": [
+      "Welcome to Oakcross Village, traveler.",
+      "Before I trust you with bigger work, speak to Mira at the market stall for me.",
+      "Return after you've checked in with her."
+    ],
+    "in_progress": [
+      "Mira keeps the village supplied.",
+      "Find her by the market stall and then report back to me."
+    ],
+    "ready_to_turn_in": [
+      "You found Mira. Good.",
+      "That tells me you can listen, explore, and return with answers.",
+      "Your first village errand is complete."
+    ],
+    "complete": {
+      "lines": [
+        "You've already proven yourself to me.",
+        "Would you like me to prepare your next assignment?"
+      ],
+      "choices": [
+        {
+          "id": "accept_task",
+          "text": "Yes, I'm ready.",
+          "response_lines": [
+            "Good. Then listen carefully.",
+            "Read the village sign, recover Mira's supply ledger from the sealed chest, and bring it to her."
+          ],
+          "effects": {
+            "rowan_offer_state": "accepted",
+            "quest_two_stage": "visit_sign"
+          }
+        },
+        {
+          "id": "delay_task",
+          "text": "Not yet.",
+          "response_lines": [
+            "Fair enough.",
+            "Take a breath and come back when you're ready."
+          ],
+          "effects": {
+            "rowan_offer_state": "declined"
+          }
+        }
+      ]
+    },
+    "quest_two_visit_sign": [
+      "Your supply run is active now.",
+      "Read the village sign in the square, then head east to the sealed supply chest for Mira's ledger."
+    ],
+    "quest_two_open_chest": [
+      "Good. You've read the sign and confirmed the route.",
+      "Now open the sealed supply chest near the eastern house and bring Mira's ledger to the market."
+    ],
+    "quest_two_report_to_mira": [
+      "You have the ledger now.",
+      "Take it to Mira at the market stall so she can finish the supply check."
+    ],
+    "quest_two_complete": [
+      "You handled the village supply run well.",
+      "That kind of follow-through is exactly what Oakcross needs."
+    ]
+  },
+  "mira": {
+    "not_started": [
+      "Fresh fruit, bread, and herbs.",
+      "If Elder Rowan sent you, come back after you've spoken with him first."
+    ],
+    "in_progress": [
+      "So Rowan sent you?",
+      "Tell him the market is ready and the village is counting on him."
+    ],
+    "ready_to_turn_in": [
+      "You've already got what you need from me.",
+      "Rowan is waiting for your report."
+    ],
+    "complete": {
+      "lines": [
+        "You handled Rowan's errand nicely.",
+        "Need anything while you're here?"
+      ],
+      "choices": [
+        {
+          "id": "ask_supplies",
+          "text": "What do you sell?",
+          "response_lines": [
+            "Mostly bread, herbs, and a few travel tools.",
+            "Take a look. If your purse can handle it, the stock is yours."
+          ],
+          "effects": {
+            "open_shop": "mira"
+          }
+        },
+        {
+          "id": "leave_market",
+          "text": "Maybe later.",
+          "response_lines": [
+            "No pressure.",
+            "Come back when your pack feels a little too empty."
+          ]
+        }
+      ]
+    },
+    "quest_two_report": {
+      "lines": [
+        "That's my ledger. Perfect.",
+        "You kept the route, the chest, and the delivery straight.",
+        "Take these healer's herbs as thanks. That completes the supply run."
+      ],
+      "effects": {
+        "quest_two_stage": "complete",
+        "inventory_add": {
+          "name": "Healer's Herbs",
+          "kind": "consumable"
+        },
+        "inventory_remove": "Supply Ledger"
+      }
+    },
+    "quest_two_complete": {
+      "lines": [
+        "The herbs are yours now.",
+        "If Rowan sends you again, you'll be ready.",
+        "Need anything from the market while you're here?"
+      ],
+      "choices": [
+        {
+          "id": "ask_supplies_again",
+          "text": "What do you sell?",
+          "response_lines": [
+            "Mostly bread, herbs, and a few travel tools.",
+            "Take a look. If your purse can handle it, the stock is yours."
+          ],
+          "effects": {
+            "open_shop": "mira"
+          }
+        },
+        {
+          "id": "leave_market_again",
+          "text": "Maybe later.",
+          "response_lines": [
+            "No pressure.",
+            "Come back when your pack feels a little too empty."
+          ]
+        }
+      ]
+    },
+    "rat_quest_offer": {
+      "lines": [
+        "I'm glad you came by.",
+        "The south road has turned ugly. Rats are nesting in the tall grass, chewing sacks, and scaring off anyone headed for the lower fields.",
+        "If you can clear them out, bring me 10 Rat Tails as proof."
+      ],
+      "choices": [
+        {
+          "id": "accept_rat_quest",
+          "text": "I'll clear the rats.",
+          "response_lines": [
+            "Thank you.",
+            "Follow the road south from the square. Don't just fight them, remember to pick up the tails.",
+            "Bring me 10 and I'll know the infestation is handled."
+          ],
+          "effects": {
+            "rat_quest_stage": "active"
+          }
+        },
+        {
+          "id": "delay_rat_quest",
+          "text": "Not right now.",
+          "response_lines": [
+            "I understand.",
+            "But if the scratching gets any closer to the stalls, I might climb onto the roof and stay there."
+          ]
+        }
+      ]
+    },
+    "rat_quest_active": {
+      "lines": [
+        "The rats are still thick south of the village.",
+        "Bring me 10 Rat Tails so I know the road is safe again."
+      ]
+    },
+    "rat_quest_ready": {
+      "lines": [
+        "You have the tails? Good. That means the south road can breathe again.",
+        "Hand them over and I'll make it worth the trouble."
+      ],
+      "choices": [
+        {
+          "id": "turn_in_rat_tails",
+          "text": "Here are the 10 Rat Tails.",
+          "response_lines": [
+            "Perfect. That's exactly what I needed.",
+            "Oakcross owes you for keeping the road clear. Take this for your work."
+          ],
+          "effects": {
+            "rat_quest_stage": "complete",
+            "inventory_remove": {
+              "name": "Rat Tail",
+              "count": 10
+            },
+            "gold_reward": 24,
+            "xp_reward": 12
+          }
+        },
+        {
+          "id": "hold_rat_tails",
+          "text": "I'll keep them for now.",
+          "response_lines": [
+            "Your pack, your choice.",
+            "Bring them back when you're ready to finish the job."
+          ]
+        }
+      ]
+    },
+    "rat_quest_complete": {
+      "lines": [
+        "The south road is calmer now.",
+        "If the rats come back, I'll know who to ask."
+      ],
+      "choices": [
+        {
+          "id": "ask_supplies_after_rats",
+          "text": "What do you sell?",
+          "response_lines": [
+            "Mostly bread, herbs, and a few travel tools.",
+            "Take a look. If your purse can handle it, the stock is yours."
+          ],
+          "effects": {
+            "open_shop": "mira"
+          }
+        },
+        {
+          "id": "leave_market_after_rats",
+          "text": "Maybe later.",
+          "response_lines": [
+            "No pressure.",
+            "Come back when your pack feels a little too empty."
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,32 @@
+[gd_scene load_steps=4 format=3 uid="uid://bhh1odm1ylgxj"]
+
+[ext_resource type="Script" path="res://scripts/interactables/signpost.gd" id="1_nmqcu"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_l56lc"]
+size = Vector2(28, 34)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_fqg6c"]
+radius = 22.0
+
+[node name="Signpost" type="StaticBody2D"]
+input_pickable = true
+script = ExtResource("1_nmqcu")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, 3)
+shape = SubResource("RectangleShape2D_l56lc")
+
+[node name="Board" type="Polygon2D" parent="."]
+position = Vector2(0, -10)
+polygon = PackedVector2Array(-18, -10, 18, -10, 18, 10, -18, 10)
+color = Color(0.784314, 0.647059, 0.411765, 1)
+
+[node name="Post" type="Polygon2D" parent="."]
+position = Vector2(0, 10)
+polygon = PackedVector2Array(-4, -12, 4, -12, 4, 16, -4, 16)
+color = Color(0.529412, 0.352941, 0.192157, 1)
+
+[node name="InteractionArea" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea"]
+shape = SubResource("CircleShape2D_fqg6c")

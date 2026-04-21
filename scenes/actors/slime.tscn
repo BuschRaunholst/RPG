@@ -1,0 +1,77 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/actors/slime.gd" id="1_0m4ts"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 14.0
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_enemy_health_under"]
+bg_color = Color(1, 1, 1, 0.92)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.145098, 0.145098, 0.145098, 0.82)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_enemy_health_fill"]
+bg_color = Color(0.839216, 0.254902, 0.254902, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="Slime" type="CharacterBody2D"]
+script = ExtResource("1_0m4ts")
+enemy_id = "oakcross_slime"
+enemy_name = "Moss Slime"
+enemy_type = "slime"
+mob_category = "beast"
+faction = "wild"
+xp_reward = 6
+gold_reward = 3
+loot_drop_name = "Slime Jelly"
+loot_drop_kind = "material"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="Shadow" type="Polygon2D" parent="."]
+position = Vector2(0, 12)
+polygon = PackedVector2Array(-16, -6, 16, -6, 12, 6, -12, 6)
+color = Color(0, 0, 0, 0.18)
+
+[node name="Body" type="Sprite2D" parent="."]
+position = Vector2(0, -4)
+
+[node name="HealthBarRoot" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -24.0
+offset_top = -36.0
+offset_right = 24.0
+offset_bottom = -22.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="HealthBar" type="ProgressBar" parent="HealthBarRoot"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+max_value = 3.0
+value = 3.0
+show_percentage = false
+mouse_filter = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_enemy_health_under")
+theme_override_styles/fill = SubResource("StyleBoxFlat_enemy_health_fill")

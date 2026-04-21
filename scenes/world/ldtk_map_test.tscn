@@ -1,0 +1,7 @@
+[gd_scene format=3 uid="uid://cxkg4tfp1purj"]
+
+[ext_resource type="Script" path="res://scripts/world/ldtk_map_loader.gd" id="1_ldtk"]
+
+[node name="LDtkMapTest" type="Node2D" unique_id=1767075633]
+script = ExtResource("1_ldtk")
+center_in_view = false

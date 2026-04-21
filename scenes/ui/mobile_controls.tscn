@@ -1,0 +1,175 @@
+[gd_scene load_steps=8 format=3 uid="uid://dp3l5v4lgtubg"]
+
+[ext_resource type="Script" path="res://scripts/ui/mobile_controls.gd" id="1_n4j2f"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_pad"]
+bg_color = Color(0.0901961, 0.117647, 0.129412, 0.22)
+corner_radius_top_left = 36
+corner_radius_top_right = 36
+corner_radius_bottom_right = 36
+corner_radius_bottom_left = 36
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.937255, 0.960784, 0.882353, 0.16)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_joystick_base"]
+bg_color = Color(0.956863, 0.972549, 0.901961, 0.2)
+corner_radius_top_left = 56
+corner_radius_top_right = 56
+corner_radius_bottom_right = 56
+corner_radius_bottom_left = 56
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.956863, 0.972549, 0.901961, 0.18)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_joystick_knob"]
+bg_color = Color(0.956863, 0.972549, 0.901961, 0.86)
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.388235, 0.552941, 0.301961, 0.45)
+shadow_color = Color(0, 0, 0, 0.16)
+shadow_size = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_interact"]
+bg_color = Color(0.964706, 0.713726, 0.266667, 0.95)
+corner_radius_top_left = 32
+corner_radius_top_right = 32
+corner_radius_bottom_right = 32
+corner_radius_bottom_left = 32
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.494118, 0.321569, 0.0901961, 0.55)
+shadow_color = Color(0, 0, 0, 0.18)
+shadow_size = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_attack"]
+bg_color = Color(0.905882, 0.447059, 0.278431, 0.95)
+corner_radius_top_left = 28
+corner_radius_top_right = 28
+corner_radius_bottom_right = 28
+corner_radius_bottom_left = 28
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.454902, 0.168627, 0.117647, 0.6)
+shadow_color = Color(0, 0, 0, 0.18)
+shadow_size = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_item"]
+bg_color = Color(0.411765, 0.639216, 0.317647, 0.95)
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.184314, 0.337255, 0.14902, 0.6)
+shadow_color = Color(0, 0, 0, 0.18)
+shadow_size = 5
+
+[node name="MobileControls" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_n4j2f")
+
+[node name="JoystickFrame" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 338.0
+offset_right = 198.0
+offset_bottom = 518.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_pad")
+
+[node name="JoystickArea" type="Control" parent="."]
+layout_mode = 0
+offset_left = 28.0
+offset_top = 348.0
+offset_right = 188.0
+offset_bottom = 508.0
+mouse_filter = 0
+
+[node name="Base" type="Panel" parent="JoystickArea"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 136.0
+offset_bottom = 136.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_joystick_base")
+
+[node name="Knob" type="Panel" parent="JoystickArea"]
+layout_mode = 0
+offset_left = 56.0
+offset_top = 56.0
+offset_right = 104.0
+offset_bottom = 104.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_joystick_knob")
+
+[node name="InteractRing" type="Panel" parent="."]
+layout_mode = 0
+offset_left = 796.0
+offset_top = 344.0
+offset_right = 948.0
+offset_bottom = 496.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_pad")
+
+[node name="InteractButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 814.0
+offset_top = 362.0
+offset_right = 930.0
+offset_bottom = 478.0
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxFlat_interact")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_interact")
+theme_override_styles/hover = SubResource("StyleBoxFlat_interact")
+text = "Attack"
+
+[node name="AttackButton" type="Button" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 778.0
+offset_top = 296.0
+offset_right = 870.0
+offset_bottom = 388.0
+theme_override_font_sizes/font_size = 20
+theme_override_styles/normal = SubResource("StyleBoxFlat_attack")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_attack")
+theme_override_styles/hover = SubResource("StyleBoxFlat_attack")
+text = "Hit"
+
+[node name="QuickItemButton" type="Button" parent="."]
+layout_mode = 0
+offset_left = 706.0
+offset_top = 372.0
+offset_right = 796.0
+offset_bottom = 462.0
+disabled = true
+theme_override_font_sizes/font_size = 14
+theme_override_styles/normal = SubResource("StyleBoxFlat_item")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_item")
+theme_override_styles/hover = SubResource("StyleBoxFlat_item")
+text = "Item"

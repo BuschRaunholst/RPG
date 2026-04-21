@@ -1,0 +1,312 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/player_view.gd" id="1_player"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
+bg_color = Color(0.0627451, 0.0745098, 0.0823529, 0.96)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.980392, 0.937255, 0.662745, 0.12)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_section_panel"]
+bg_color = Color(0.117647, 0.133333, 0.12549, 0.98)
+corner_radius_top_left = 16
+corner_radius_top_right = 16
+corner_radius_bottom_right = 16
+corner_radius_bottom_left = 16
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.980392, 0.937255, 0.662745, 0.12)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_silhouette_panel"]
+bg_color = Color(0.0941176, 0.105882, 0.117647, 0.98)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_silhouette_glow"]
+bg_color = Color(0.266667, 0.356863, 0.341176, 0.22)
+corner_radius_top_left = 60
+corner_radius_top_right = 60
+corner_radius_bottom_right = 60
+corner_radius_bottom_left = 60
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_popup_panel"]
+bg_color = Color(0.0627451, 0.0745098, 0.0823529, 0.98)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.980392, 0.937255, 0.662745, 0.12)
+
+[node name="PlayerView" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_player")
+
+[node name="PlayerPanel" type="PanelContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="PlayerPanel"]
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="MainRow" type="HBoxContainer" parent="PlayerPanel/MarginContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="LeftColumn" type="VBoxContainer" parent="PlayerPanel/MarginContainer/MainRow"]
+custom_minimum_size = Vector2(220, 0)
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="HeaderPanel" type="PanelContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_section_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/HeaderPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PlayerName" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/HeaderPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "PLAYER"
+theme_override_colors/font_color = Color(0.964706, 0.933333, 0.654902, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="BodyPanel" type="PanelContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/HeaderPanel/MarginContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 104)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_silhouette_panel")
+
+[node name="BodyMargin" type="MarginContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/HeaderPanel/MarginContainer/VBoxContainer/BodyPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="BodyInner" type="VBoxContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/HeaderPanel/MarginContainer/VBoxContainer/BodyPanel/BodyMargin"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 6
+
+[node name="Halo" type="PanelContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/HeaderPanel/MarginContainer/VBoxContainer/BodyPanel/BodyMargin/BodyInner"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_silhouette_glow")
+
+[node name="BodyText" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/HeaderPanel/MarginContainer/VBoxContainer/BodyPanel/BodyMargin/BodyInner"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Adventurer"
+theme_override_colors/font_color = Color(0.937255, 0.956863, 0.886275, 1)
+theme_override_font_sizes/font_size = 22
+
+[node name="BodyHint" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/HeaderPanel/MarginContainer/VBoxContainer/BodyPanel/BodyMargin/BodyInner"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "ATK 0 DEF 0 HP 0"
+theme_override_colors/font_color = Color(0.741176, 0.796078, 0.721569, 0.8)
+theme_override_font_sizes/font_size = 11
+
+[node name="StatsPanel" type="PanelContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_section_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="LevelLabel" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Level 1"
+theme_override_colors/font_color = Color(0.964706, 0.933333, 0.654902, 1)
+theme_override_font_sizes/font_size = 14
+
+[node name="PointsLabel" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Points: 0"
+theme_override_colors/font_color = Color(0.741176, 0.796078, 0.721569, 0.9)
+theme_override_font_sizes/font_size = 11
+
+[node name="StatRows" type="VBoxContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="StrengthRow" type="HBoxContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StrengthName" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows/StrengthRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Strength"
+
+[node name="StrengthValue" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows/StrengthRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(24, 0)
+horizontal_alignment = 1
+text = "1"
+
+[node name="StrengthAdd" type="Button" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows/StrengthRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(30, 24)
+text = "+"
+
+[node name="StaminaRow" type="HBoxContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StaminaName" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows/StaminaRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Stamina"
+
+[node name="StaminaValue" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows/StaminaRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(24, 0)
+horizontal_alignment = 1
+text = "1"
+
+[node name="StaminaAdd" type="Button" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows/StaminaRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(30, 24)
+text = "+"
+
+[node name="DexterityRow" type="HBoxContainer" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="DexterityName" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows/DexterityRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Dexterity"
+
+[node name="DexterityValue" type="Label" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows/DexterityRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(24, 0)
+horizontal_alignment = 1
+text = "1"
+
+[node name="DexterityAdd" type="Button" parent="PlayerPanel/MarginContainer/MainRow/LeftColumn/StatsPanel/MarginContainer/VBoxContainer/StatRows/DexterityRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(30, 24)
+text = "+"
+
+[node name="RightColumn" type="PanelContainer" parent="PlayerPanel/MarginContainer/MainRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_section_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="PlayerPanel/MarginContainer/MainRow/RightColumn"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PlayerPanel/MarginContainer/MainRow/RightColumn/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="EquipmentTitle" type="Label" parent="PlayerPanel/MarginContainer/MainRow/RightColumn/MarginContainer/VBoxContainer"]
+layout_mode = 2
+text = "Equipped"
+theme_override_colors/font_color = Color(0.964706, 0.933333, 0.654902, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="EquipmentGrid" type="GridContainer" parent="PlayerPanel/MarginContainer/MainRow/RightColumn/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+columns = 2
+theme_override_constants/h_separation = 10
+theme_override_constants/v_separation = 10
+
+[node name="GearSummary" type="Label" parent="PlayerPanel/MarginContainer/MainRow/RightColumn/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+autowrap_mode = 3
+horizontal_alignment = 0
+text = "Weapon: Empty"
+theme_override_colors/font_color = Color(0.917647, 0.92549, 0.878431, 1)
+theme_override_font_sizes/font_size = 12
+
+[node name="ItemPopup" type="PanelContainer" parent="."]
+visible = false
+z_index = 5
+custom_minimum_size = Vector2(220, 130)
+theme_override_styles/panel = SubResource("StyleBoxFlat_popup_panel")
+
+[node name="PopupMargin" type="MarginContainer" parent="ItemPopup"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="PopupVBox" type="VBoxContainer" parent="ItemPopup/PopupMargin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PopupTitle" type="Label" parent="ItemPopup/PopupMargin/PopupVBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Item"
+theme_override_colors/font_color = Color(0.964706, 0.933333, 0.654902, 1)
+theme_override_font_sizes/font_size = 16
+
+[node name="PopupBody" type="Label" parent="ItemPopup/PopupMargin/PopupVBox"]
+custom_minimum_size = Vector2(0, 70)
+layout_mode = 2
+autowrap_mode = 3
+vertical_alignment = 1
+text = "Details"
+theme_override_colors/font_color = Color(0.917647, 0.92549, 0.878431, 1)
+theme_override_font_sizes/font_size = 11

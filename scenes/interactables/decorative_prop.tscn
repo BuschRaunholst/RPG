@@ -1,0 +1,21 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/interactables/decorative_prop.gd" id="1_prop"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_prop"]
+size = Vector2(30, 24)
+
+[node name="DecorativeProp" type="StaticBody2D"]
+script = ExtResource("1_prop")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, 6)
+shape = SubResource("RectangleShape2D_prop")
+
+[node name="Shadow" type="Polygon2D" parent="."]
+position = Vector2(0, 16)
+polygon = PackedVector2Array(-18, -5, 18, -5, 14, 5, -14, 5)
+color = Color(0, 0, 0, 0.18)
+
+[node name="Body" type="Sprite2D" parent="."]
+position = Vector2(0, -2)

@@ -1,0 +1,31 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/interactables/dropped_loot.gd" id="1_drop"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 10.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_interaction"]
+radius = 28.0
+
+[node name="DroppedLoot" type="StaticBody2D"]
+input_pickable = true
+script = ExtResource("1_drop")
+interaction_outline_size = Vector2(30, 26)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, 6)
+shape = SubResource("CircleShape2D_body")
+
+[node name="SpriteRoot" type="Node2D" parent="."]
+
+[node name="InteractionGlow" type="Sprite2D" parent="SpriteRoot"]
+position = Vector2(0, -4)
+
+[node name="Body" type="Sprite2D" parent="SpriteRoot"]
+position = Vector2(0, -4)
+
+[node name="InteractionArea" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InteractionArea"]
+shape = SubResource("CircleShape2D_interaction")

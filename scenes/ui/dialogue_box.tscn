@@ -1,0 +1,95 @@
+[gd_scene load_steps=4 format=3 uid="uid://cjpdmo1q4fw4d"]
+
+[ext_resource type="Script" path="res://scripts/ui/dialogue_box.gd" id="1_qdf43"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dialogue"]
+bg_color = Color(0.101961, 0.129412, 0.12549, 0.94)
+corner_radius_top_left = 24
+corner_radius_top_right = 24
+corner_radius_bottom_right = 24
+corner_radius_bottom_left = 24
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.913726, 0.952941, 0.768627, 0.24)
+shadow_color = Color(0, 0, 0, 0.28)
+shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_choice"]
+bg_color = Color(0.94902, 0.968627, 0.886275, 0.96)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.411765, 0.588235, 0.32549, 0.42)
+
+[node name="DialogueBox" type="CanvasLayer"]
+script = ExtResource("1_qdf43")
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchors_preset = 10
+anchor_left = 0.06
+anchor_top = 0.64
+anchor_right = 0.94
+anchor_bottom = 0.95
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_dialogue")
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel"]
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 16
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel/MarginContainer"]
+theme_override_constants/separation = 10
+
+[node name="NameLabel" type="Label" parent="Panel/MarginContainer/VBoxContainer" unique_name_in_owner="true"]
+theme_override_colors/font_color = Color(0.972549, 0.815686, 0.392157, 1)
+theme_override_font_sizes/font_size = 20
+text = "Speaker"
+
+[node name="BodyLabel" type="Label" parent="Panel/MarginContainer/VBoxContainer" unique_name_in_owner="true"]
+theme_override_colors/font_color = Color(0.960784, 0.972549, 0.917647, 1)
+theme_override_font_sizes/font_size = 18
+autowrap_mode = 3
+text = "Dialogue goes here."
+
+[node name="ChoicesContainer" type="VBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
+visible = false
+theme_override_constants/separation = 8
+
+[node name="ChoiceA" type="Button" parent="Panel/MarginContainer/VBoxContainer/ChoicesContainer"]
+custom_minimum_size = Vector2(0, 50)
+theme_override_colors/font_color = Color(0.180392, 0.219608, 0.145098, 1)
+theme_override_colors/font_pressed_color = Color(0.180392, 0.219608, 0.145098, 1)
+theme_override_colors/font_hover_color = Color(0.180392, 0.219608, 0.145098, 1)
+theme_override_colors/font_focus_color = Color(0.180392, 0.219608, 0.145098, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_choice")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_choice")
+theme_override_styles/hover = SubResource("StyleBoxFlat_choice")
+text = "Choice A"
+
+[node name="ChoiceB" type="Button" parent="Panel/MarginContainer/VBoxContainer/ChoicesContainer"]
+custom_minimum_size = Vector2(0, 50)
+theme_override_colors/font_color = Color(0.180392, 0.219608, 0.145098, 1)
+theme_override_colors/font_pressed_color = Color(0.180392, 0.219608, 0.145098, 1)
+theme_override_colors/font_hover_color = Color(0.180392, 0.219608, 0.145098, 1)
+theme_override_colors/font_focus_color = Color(0.180392, 0.219608, 0.145098, 1)
+theme_override_font_sizes/font_size = 18
+theme_override_styles/normal = SubResource("StyleBoxFlat_choice")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_choice")
+theme_override_styles/hover = SubResource("StyleBoxFlat_choice")
+text = "Choice B"
+
+[node name="HintLabel" type="Label" parent="Panel/MarginContainer/VBoxContainer" unique_name_in_owner="true"]
+theme_override_colors/font_color = Color(0.764706, 0.839216, 0.733333, 1)
+horizontal_alignment = 2
+text = "Press E to continue"

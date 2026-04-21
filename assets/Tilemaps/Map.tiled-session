@@ -1,0 +1,68 @@
+{
+    "activeFile": "C:/Users/Jakob/Documents/Test.tmx",
+    "expandedProjectPaths": [
+        ".",
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor",
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets",
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK"
+    ],
+    "fileStates": {
+        "": {
+            "scaleInDock": 0.5
+        },
+        "C:/Users/Jakob/Documents/Test.tmx": {
+            "scale": 1,
+            "selectedLayer": 2,
+            "viewCenter": {
+                "x": -179.5,
+                "y": -50.5
+            }
+        },
+        "C:/Users/Jakob/Documents/Test.tmx#Tilesets grassland": {
+            "scaleInDock": 0.5
+        },
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/Houses.tsx": {
+            "scaleInDock": 0.33,
+            "scaleInEditor": 1
+        },
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/Tilesets and props Demo.tsx": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/Tilesets grassland.tsx": {
+            "scaleInDock": 0.5,
+            "scaleInEditor": 1
+        },
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/furniture_and_props.tsx": {
+            "scaleInDock": 0.5,
+            "scaleInEditor": 0.75
+        },
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/sample map demo.tmx": {
+            "scale": 0.75,
+            "selectedLayer": 0,
+            "viewCenter": {
+                "x": 525.3333333333334,
+                "y": 311.33333333333326
+            }
+        }
+    },
+    "last.imagePath": "C:/Users/Jakob/Downloads/Tilemaps/Epic RPG World - Village(interiors) V1.3/assets",
+    "map.fixedSize": false,
+    "map.lastUsedFormat": "tmx",
+    "openFiles": [
+        "C:/Users/Jakob/Documents/Test.tmx",
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/Tilesets grassland.tsx",
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/Houses.tsx",
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/furniture_and_props.tsx"
+    ],
+    "project": "Map.tiled-project",
+    "recentFiles": [
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/furniture_and_props.tsx",
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/Houses.tsx",
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/Tilesets grassland.tsx",
+        "C:/Users/Jakob/Documents/Test.tmx",
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/Tilesets/Tilesets and props Demo.tsx",
+        "EPIC RPG World Pack - [FREE Demo]Grass Land 2.0-REWORK/TiledMap Editor/sample map demo.tmx"
+    ],
+    "tileset.lastUsedFormat": "tsx"
+}
