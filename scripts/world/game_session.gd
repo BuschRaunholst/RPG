@@ -77,9 +77,11 @@ func change_scene_with_fade(scene_path: String) -> void:
 		return
 
 	transition_in_progress = true
+	_reset_overlay_contextual_state()
 	await _fade_to(1.0, 0.2)
 	get_tree().change_scene_to_file(scene_path)
 	await get_tree().process_frame
+	_reset_overlay_contextual_state()
 	await _fade_to(0.0, 0.2)
 	transition_in_progress = false
 
@@ -99,6 +101,7 @@ func _setup_fade_layer() -> void:
 func _setup_overlay() -> void:
 	overlay = OverlayScene.instantiate()
 	add_child(overlay)
+	_reset_overlay_contextual_state()
 
 
 func show_game_overlay() -> void:
@@ -149,6 +152,16 @@ func set_overlay_progression_state(level: int, unspent_points: int, allocations:
 func set_overlay_save_status(text: String) -> void:
 	if overlay != null:
 		overlay.set_save_status(text)
+
+
+func set_overlay_dungeon_map_state(map_data: Dictionary) -> void:
+	if overlay != null and overlay.has_method("set_dungeon_map_state"):
+		overlay.call("set_dungeon_map_state", map_data)
+
+
+func set_overlay_dungeon_map_player_position(player_map_position: Vector2, player_cell: Vector2i) -> void:
+	if overlay != null and overlay.has_method("set_dungeon_map_player_position"):
+		overlay.call("set_dungeon_map_player_position", player_map_position, player_cell)
 
 
 func set_overlay_menu_locked(value: bool) -> void:
@@ -507,6 +520,11 @@ func _disconnect_overlay_signal(signal_name: String) -> void:
 		var callable: Callable = connection.get("callable", Callable())
 		if callable.is_valid():
 			overlay.disconnect(signal_name, callable)
+
+
+func _reset_overlay_contextual_state() -> void:
+	if overlay != null and overlay.has_method("set_dungeon_map_state"):
+		overlay.call("set_dungeon_map_state", {"enabled": false})
 
 
 func _fade_to(alpha: float, duration: float) -> void:

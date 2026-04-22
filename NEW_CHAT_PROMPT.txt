@@ -1,0 +1,21 @@
+Read AGENTS.md and the files it references before making changes.
+
+We are continuing work in:
+C:\Users\Jakob\Documents\RPG
+
+Use CHAT_HANDOFF_TEMPLATE.md as the structure for this thread.
+
+Current subsystem:
+[write subsystem here]
+
+Goal for this thread:
+[write exact goal here]
+
+Files likely involved:
+[write file paths here]
+
+Things not to change unless necessary:
+[write constraints here]
+
+Known issue / desired outcome:
+[write issue here]

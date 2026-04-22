@@ -23,6 +23,7 @@ signal context_action_requested
 @onready var weapon_socket: Node2D = $RightArmPivot/WeaponSocket
 @onready var weapon_pivot: Node2D = $RightArmPivot/WeaponSocket/WeaponPivot
 @onready var weapon_sprite: Sprite2D = $RightArmPivot/WeaponSocket/WeaponPivot/WeaponSprite
+@onready var interaction_detector: Area2D = $InteractionDetector
 
 const TUNIC_FRAMES = preload("res://assets/art/characters/player_clothes_village_tunic_4dir_64_frames.tres")
 const BOOTS_FRAMES = preload("res://assets/art/characters/player_boots_worn_4dir_64_frames.tres")
@@ -102,13 +103,12 @@ func set_can_move(value: bool) -> void:
 		velocity = Vector2.ZERO
 
 
-func _on_interaction_detector_area_entered(area: Area2D) -> void:
-	_set_nearby_interactable(area.get_parent())
+func _on_interaction_detector_area_entered(_area: Area2D) -> void:
+	refresh_nearby_interactable()
 
 
-func _on_interaction_detector_area_exited(area: Area2D) -> void:
-	if nearby_interactable == area.get_parent():
-		_set_nearby_interactable(null)
+func _on_interaction_detector_area_exited(_area: Area2D) -> void:
+	refresh_nearby_interactable()
 
 
 func can_interact_with(target: Node) -> bool:
@@ -125,6 +125,30 @@ func get_nearby_interactable() -> Node:
 	return nearby_interactable
 
 
+func refresh_nearby_interactable() -> void:
+	if interaction_detector == null:
+		_set_nearby_interactable(null)
+		return
+
+	var best_target: Node = null
+	var best_distance: float = INF
+	for area in interaction_detector.get_overlapping_areas():
+		if area == null or not is_instance_valid(area):
+			continue
+		var candidate: Node = area.get_parent()
+		if not _is_valid_interactable(candidate):
+			continue
+		if candidate is Node2D:
+			var candidate_distance: float = global_position.distance_squared_to((candidate as Node2D).global_position)
+			if candidate_distance < best_distance:
+				best_distance = candidate_distance
+				best_target = candidate
+		elif best_target == null:
+			best_target = candidate
+
+	_set_nearby_interactable(best_target)
+
+
 func _set_nearby_interactable(target: Node) -> void:
 	if highlighted_interactable != null and highlighted_interactable.has_method("set_interaction_highlight"):
 		highlighted_interactable.call("set_interaction_highlight", false)
@@ -137,10 +161,20 @@ func _set_nearby_interactable(target: Node) -> void:
 
 
 func try_interact() -> bool:
+	if not _is_valid_interactable(nearby_interactable):
+		refresh_nearby_interactable()
 	if nearby_interactable == null:
 		return false
 
 	interacted.emit(nearby_interactable)
+	return true
+
+
+func _is_valid_interactable(target: Node) -> bool:
+	if target == null or not is_instance_valid(target) or not target.is_inside_tree():
+		return false
+	if target.has_method("collect_pickup") and bool(target.get("is_collected")):
+		return false
 	return true
 
 

@@ -12,19 +12,25 @@ signal tracked_quest_toggled(quest_id: String)
 const XP_BAR_STEP := 10
 const INFO_DISPLAY_SECONDS := 2.6
 const INFO_FADE_SECONDS := 0.45
-const FULL_MENU_OFFSETS := {"left": -432.0, "top": 88.0, "right": 432.0, "bottom": 484.0}
-const CHARACTER_MENU_OFFSETS := {"left": -400.0, "top": 92.0, "right": 470.0, "bottom": 430.0}
+const HUD_SIDE_MARGIN := 16.0
+const HUD_TOP_MARGIN := 12.0
+const HUD_GAP := 10.0
+const COMPACT_LAYOUT_WIDTH := 760.0
+const MINIMAP_RESERVED_WIDTH := 214.0
 
 @onready var location_label: Label = $AreaLabel
 @onready var combat_label: Label = $InfoLabel
+@onready var vitals_panel: PanelContainer = $VitalsPanel
 @onready var health_bar: ProgressBar = $VitalsPanel/VBoxContainer/HealthBar
 @onready var health_label: Label = $VitalsPanel/VBoxContainer/HealthBar/HealthLabel
 @onready var xp_bar: ProgressBar = $VitalsPanel/VBoxContainer/XpBar
 @onready var xp_label: Label = $VitalsPanel/VBoxContainer/XpBar/XpLabel
+@onready var top_menu_bar: HBoxContainer = $TopMenuBar
 @onready var quest_menu_button: Button = $TopMenuBar/QuestMenuButton
 @onready var player_menu_button: Button = $TopMenuBar/PlayerMenuButton
 @onready var inventory_menu_button: Button = $TopMenuBar/InventoryMenuButton
 @onready var save_menu_button: Button = $TopMenuBar/SaveMenuButton
+@onready var tracked_quest_panel: PanelContainer = $TrackedQuestPanel
 @onready var tracked_quest_title_label: Label = $TrackedQuestPanel/MarginContainer/VBoxContainer/TrackedQuestTitle
 @onready var tracked_quest_body_label: Label = $TrackedQuestPanel/MarginContainer/VBoxContainer/TrackedQuestBody
 @onready var menu_dimmer: ColorRect = $MenuDimmer
@@ -47,6 +53,7 @@ const CHARACTER_MENU_OFFSETS := {"left": -400.0, "top": 92.0, "right": 470.0, "b
 @onready var save_status_label: Label = $MenuPanel/MarginContainer/VBoxContainer/Pages/SavePage/SaveStatus
 @onready var save_button: Button = $MenuPanel/MarginContainer/VBoxContainer/Pages/SavePage/ButtonRow/SaveButton
 @onready var load_button: Button = $MenuPanel/MarginContainer/VBoxContainer/Pages/SavePage/ButtonRow/LoadButton
+@onready var dungeon_map: Control = $DungeonMap
 
 var info_fade_tween: Tween
 var current_tab: String = "quest"
@@ -89,8 +96,11 @@ func _ready() -> void:
 	player_window.visible = false
 	character_spacer.visible = false
 	inventory_window.visible = false
+	if not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
+		get_viewport().size_changed.connect(_on_viewport_size_changed)
 	_show_menu_tab(current_tab)
 	_update_top_menu_buttons()
+	call_deferred("_apply_responsive_layout")
 
 
 func set_quest(title: String, body: String) -> void:
@@ -140,6 +150,17 @@ func set_progression_state(level: int, unspent_points: int, allocations: Diction
 
 func set_save_status(text: String) -> void:
 	save_status_label.text = text
+
+
+func set_dungeon_map_state(map_data: Dictionary) -> void:
+	if dungeon_map != null and dungeon_map.has_method("set_map_state"):
+		dungeon_map.call("set_map_state", map_data)
+	_apply_responsive_layout()
+
+
+func set_dungeon_map_player_position(player_map_position: Vector2, player_cell: Vector2i) -> void:
+	if dungeon_map != null and dungeon_map.has_method("set_player_tracking"):
+		dungeon_map.call("set_player_tracking", player_map_position, player_cell)
 
 
 func set_quest_journal(entries: Array, next_tracked_quest_ids: Array = []) -> void:
@@ -291,7 +312,7 @@ func _show_menu_tab(tab_name: String) -> void:
 		menu_panel.add_theme_stylebox_override("panel", empty_menu_panel_style)
 	else:
 		menu_panel.add_theme_stylebox_override("panel", default_menu_panel_style)
-	_apply_menu_offsets(CHARACTER_MENU_OFFSETS if tab_name == "character" else FULL_MENU_OFFSETS)
+	_apply_menu_layout(tab_name)
 	_update_top_menu_buttons()
 
 
@@ -399,11 +420,101 @@ func _is_any_menu_open() -> bool:
 	return menu_panel.visible or player_window.visible or inventory_window.visible
 
 
-func _apply_menu_offsets(offsets: Dictionary) -> void:
-	menu_panel.offset_left = float(offsets.get("left", menu_panel.offset_left))
-	menu_panel.offset_top = float(offsets.get("top", menu_panel.offset_top))
-	menu_panel.offset_right = float(offsets.get("right", menu_panel.offset_right))
-	menu_panel.offset_bottom = float(offsets.get("bottom", menu_panel.offset_bottom))
+func _on_viewport_size_changed() -> void:
+	_apply_responsive_layout()
+
+
+func _apply_responsive_layout() -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var compact: bool = viewport_size.x <= COMPACT_LAYOUT_WIDTH
+	var side_margin: float = 10.0 if compact else HUD_SIDE_MARGIN
+	var top_margin: float = 10.0 if compact else HUD_TOP_MARGIN
+	var top_button_width: float = 48.0 if compact else 58.0
+	var top_button_height: float = 30.0 if compact else 34.0
+	var top_button_font_size: int = 11 if compact else 12
+	var vitals_width: float = clampf(viewport_size.x * (0.24 if compact else 0.21), 136.0, 220.0)
+	var bar_height: float = 16.0 if compact else 18.0
+	var info_top: float = -82.0 if compact else -54.0
+	var vitals_height: float = 54.0
+	var center_x: float = viewport_size.x * 0.5
+
+	for button in [quest_menu_button, player_menu_button, inventory_menu_button, save_menu_button]:
+		button.custom_minimum_size = Vector2(top_button_width, top_button_height)
+		button.add_theme_font_size_override("font_size", top_button_font_size)
+
+	var top_menu_width: float = top_button_width * 4.0 + HUD_GAP * 3.0
+	top_menu_bar.anchor_left = 1.0
+	top_menu_bar.anchor_right = 1.0
+	top_menu_bar.offset_left = -side_margin - top_menu_width
+	top_menu_bar.offset_top = top_margin
+	top_menu_bar.offset_right = -side_margin
+	top_menu_bar.offset_bottom = top_margin + top_button_height
+
+	vitals_panel.offset_left = side_margin
+	vitals_panel.offset_top = top_margin
+	vitals_panel.offset_right = side_margin + vitals_width
+	vitals_panel.offset_bottom = top_margin + vitals_height
+	health_bar.custom_minimum_size = Vector2(0.0, bar_height)
+	xp_bar.custom_minimum_size = Vector2(0.0, maxf(10.0, bar_height * 0.72))
+	health_label.add_theme_font_size_override("font_size", 10 if compact else 11)
+	xp_label.add_theme_font_size_override("font_size", 10 if compact else 11)
+
+	location_label.anchor_left = 0.0
+	location_label.anchor_right = 1.0
+	location_label.add_theme_font_size_override("font_size", 15 if compact else 18)
+	if compact:
+		location_label.offset_left = side_margin
+		location_label.offset_right = -side_margin
+		location_label.offset_top = top_margin + vitals_height + 2.0
+		location_label.offset_bottom = location_label.offset_top + 24.0
+	else:
+		var header_left: float = side_margin + vitals_width + HUD_GAP
+		var header_right: float = side_margin + top_menu_width + HUD_GAP
+		location_label.offset_left = header_left
+		location_label.offset_right = -header_right
+		location_label.offset_top = top_margin + 2.0
+		location_label.offset_bottom = location_label.offset_top + 26.0
+
+	tracked_quest_title_label.add_theme_font_size_override("font_size", 11 if compact else 12)
+	tracked_quest_body_label.add_theme_font_size_override("font_size", 10 if compact else 11)
+	var tracker_width: float = clampf(viewport_size.x * (0.30 if compact else 0.24), 210.0, 280.0)
+	var tracker_top: float = top_margin + vitals_height + 10.0
+	tracked_quest_panel.anchor_left = 0.0
+	tracked_quest_panel.anchor_right = 0.0
+	tracked_quest_panel.offset_left = side_margin
+	tracked_quest_panel.offset_top = tracker_top
+	tracked_quest_panel.offset_right = side_margin + tracker_width
+	tracked_quest_panel.offset_bottom = tracker_top + (58.0 if compact else 64.0)
+
+	combat_label.anchor_left = 0.0
+	combat_label.anchor_right = 1.0
+	combat_label.offset_left = 24.0
+	combat_label.offset_top = info_top
+	combat_label.offset_right = -24.0
+	combat_label.offset_bottom = -20.0
+	combat_label.add_theme_font_size_override("font_size", 10 if compact else 11)
+
+	_apply_menu_layout(current_tab)
+
+
+func _apply_menu_layout(tab_name: String) -> void:
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var compact: bool = viewport_size.x <= COMPACT_LAYOUT_WIDTH
+	menu_panel.anchor_left = 0.0
+	menu_panel.anchor_top = 0.0
+	menu_panel.anchor_right = 1.0
+	menu_panel.anchor_bottom = 1.0
+
+	var side_margin: float = 14.0 if compact else (62.0 if tab_name == "character" else 48.0)
+	var top_margin: float = 84.0 if compact else (92.0 if tab_name == "character" else 88.0)
+	var bottom_margin: float = 14.0 if compact else 24.0
+	if compact and tab_name == "character":
+		top_margin = 90.0
+
+	menu_panel.offset_left = side_margin
+	menu_panel.offset_top = top_margin
+	menu_panel.offset_right = -side_margin
+	menu_panel.offset_bottom = -bottom_margin
 
 
 func _update_top_menu_buttons() -> void:
@@ -472,10 +583,10 @@ func _refresh_tracked_quest_panel() -> void:
 		var tracked_entry: Dictionary = _get_quest_entry_by_id(quest_id)
 		if tracked_entry.is_empty():
 			continue
-		lines.append("%s: %s" % [str(tracked_entry.get("title", "Quest")), str(tracked_entry.get("summary", ""))])
+		lines.append(_format_tracked_quest_summary(tracked_entry))
 
 	tracked_quest_title_label.text = "Tracked Quests"
-	tracked_quest_body_label.text = "\n".join(lines)
+	tracked_quest_body_label.text = "\n\n---\n\n".join(lines)
 
 
 func _get_selected_quest_entry() -> Dictionary:
@@ -519,3 +630,17 @@ func _get_filtered_quest_entries() -> Array[Dictionary]:
 func _update_quest_tab_buttons() -> void:
 	_set_top_button_state(quest_active_tab_button, current_quest_filter == "active")
 	_set_top_button_state(quest_completed_tab_button, current_quest_filter == "completed")
+
+
+func _format_tracked_quest_summary(entry: Dictionary) -> String:
+	var title_text: String = str(entry.get("title", "Quest")).strip_edges()
+	var summary_text: String = str(entry.get("summary", "")).strip_edges()
+	if summary_text.begins_with("%s:" % title_text):
+		summary_text = summary_text.trim_prefix("%s:" % title_text).strip_edges()
+	elif summary_text.begins_with("%s -" % title_text):
+		summary_text = summary_text.trim_prefix("%s -" % title_text).strip_edges()
+	if summary_text.is_empty():
+		summary_text = str(entry.get("details", "")).strip_edges()
+	if not summary_text.is_empty() and not summary_text.begins_with("- "):
+		summary_text = "- %s" % summary_text
+	return "%s\n%s" % [title_text, summary_text]

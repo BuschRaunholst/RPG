@@ -16,6 +16,14 @@ const GRID_HEIGHT: int = 54
 const WALL_TILE: int = 0
 const FLOOR_TILE: int = 1
 const WALL_RENDER_RADIUS: int = 2
+const MIN_CARVE_CLEARANCE: int = 2
+const LOGICAL_GRID_WIDTH: int = 6
+const LOGICAL_GRID_HEIGHT: int = 5
+const LOGICAL_CELL_WIDTH: int = 11
+const LOGICAL_CELL_HEIGHT: int = 10
+const LOGICAL_MARGIN_X: int = 4
+const LOGICAL_MARGIN_Y: int = 3
+const MAP_REVEAL_RADIUS: int = 6
 const MAX_TRACKED_QUESTS: int = 5
 const BASE_PLAYER_HEALTH: int = 80
 const SPAWN_ENTRANCE: String = "entrance"
@@ -32,6 +40,7 @@ var depth: int = 1
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var grid: Array[Array] = []
 var rooms: Array[Rect2i] = []
+var room_archetypes: Dictionary = {}
 var player: Node2D
 var mobile_controls: Control
 var mobile_controls_layer: CanvasLayer
@@ -40,10 +49,22 @@ var wall_root: Node2D
 var collision_body: StaticBody2D
 var gameplay_root: Node2D
 var decor_root: Node2D
+var darkness_root: Node2D
+var darkness_sprite: Sprite2D
+var exploration_mask_image: Image
+var exploration_mask_texture: ImageTexture
+var darkness_material: ShaderMaterial
 var dungeon_size: Vector2 = Vector2.ZERO
 var pending_spawn_mode: String = SPAWN_ENTRANCE
 var decor_cells: Array[Vector2i] = []
+var floor_cells: Array[Vector2i] = []
 var level_cache: Dictionary = {}
+var gameplay_up_stairs_cell: Vector2i = Vector2i(-9999, -9999)
+var gameplay_down_stairs_cell: Vector2i = Vector2i(-9999, -9999)
+var gameplay_player_spawn_cell: Vector2i = Vector2i(-9999, -9999)
+var explored_cells: Dictionary = {}
+var visible_cells: Dictionary = {}
+var last_player_map_cell: Vector2i = Vector2i(-9999, -9999)
 
 var player_health: int = BASE_PLAYER_HEALTH
 var player_max_health: int = BASE_PLAYER_HEALTH
@@ -91,11 +112,23 @@ func _setup_state_from_transition() -> void:
 
 
 func _process(delta: float) -> void:
+	_update_darkness_player_uniform()
 	context_update_timer += delta
 	if context_update_timer < 0.15:
 		return
 	context_update_timer = 0.0
+	_update_minimap_tracking()
+	_update_exploration_from_player()
 	_update_context_button()
+
+
+func _update_minimap_tracking() -> void:
+	if player == null:
+		return
+	GameSession.set_overlay_dungeon_map_player_position(
+		player.global_position / float(TILE_SIZE),
+		_world_to_cell(player.global_position)
+	)
 
 
 func _build_dungeon(next_depth: int, spawn_mode: String = SPAWN_ENTRANCE) -> void:
@@ -108,6 +141,8 @@ func _build_dungeon(next_depth: int, spawn_mode: String = SPAWN_ENTRANCE) -> voi
 	_draw_dungeon()
 	_build_wall_collision()
 	_spawn_gameplay()
+	_restore_exploration_state()
+	_update_exploration_from_player(true)
 	_update_overlay("Depth %d" % depth)
 
 
@@ -116,17 +151,24 @@ func _load_or_generate_layout() -> void:
 		var cached_level: Dictionary = level_cache[depth]
 		grid = _duplicate_grid(cached_level.get("grid", []))
 		rooms = _duplicate_rooms(cached_level.get("rooms", []))
+		room_archetypes = _duplicate_room_archetypes(cached_level.get("room_archetypes", {}))
 		dungeon_size = cached_level.get("dungeon_size", Vector2(GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE))
 		rng.seed = int(cached_level.get("seed", 9001 + depth * 7919))
+		floor_cells = _duplicate_cells(cached_level.get("floor_cells", []))
+		explored_cells = _cell_array_to_set(cached_level.get("explored_cells", []))
 		return
 
 	rng.seed = 9001 + depth * 7919
 	_generate_layout()
+	_rebuild_floor_cells()
 	level_cache[depth] = {
 		"seed": rng.seed,
 		"grid": _duplicate_grid(grid),
 		"rooms": _duplicate_rooms(rooms),
-		"dungeon_size": dungeon_size
+		"room_archetypes": _duplicate_room_archetypes(room_archetypes),
+		"dungeon_size": dungeon_size,
+		"floor_cells": _duplicate_cells(floor_cells),
+		"explored_cells": []
 	}
 
 
@@ -145,6 +187,48 @@ func _duplicate_rooms(source_rooms: Array) -> Array[Rect2i]:
 	for room_variant in source_rooms:
 		next_rooms.append(room_variant)
 	return next_rooms
+
+
+func _duplicate_room_archetypes(source_archetypes: Dictionary) -> Dictionary:
+	var next_archetypes: Dictionary = {}
+	for room_key in source_archetypes.keys():
+		next_archetypes[room_key] = str(source_archetypes[room_key])
+	return next_archetypes
+
+
+func _duplicate_cells(source_cells: Array) -> Array[Vector2i]:
+	var next_cells: Array[Vector2i] = []
+	for cell_variant in source_cells:
+		if cell_variant is Vector2i:
+			next_cells.append(cell_variant)
+		elif cell_variant is Vector2:
+			var vector_cell: Vector2 = cell_variant
+			next_cells.append(Vector2i(int(round(vector_cell.x)), int(round(vector_cell.y))))
+	return next_cells
+
+
+func _cell_array_to_set(source_cells: Array) -> Dictionary:
+	var next_cells: Dictionary = {}
+	for cell in _duplicate_cells(source_cells):
+		next_cells[_logical_key(cell)] = true
+	return next_cells
+
+
+func _cell_set_to_array(source_cells: Dictionary, floor_only: bool = false) -> Array[Vector2i]:
+	var next_cells: Array[Vector2i] = []
+	for cell_key_variant in source_cells.keys():
+		var cell: Vector2i = _cell_from_key(str(cell_key_variant))
+		if floor_only and not _has_floor_neighbor(cell.x, cell.y):
+			continue
+		next_cells.append(cell)
+	return next_cells
+
+
+func _cell_from_key(cell_key: String) -> Vector2i:
+	var parts: PackedStringArray = cell_key.split(",")
+	if parts.size() != 2:
+		return Vector2i(-1, -1)
+	return Vector2i(int(parts[0]), int(parts[1]))
 
 
 func _clear_dungeon() -> void:
@@ -175,10 +259,16 @@ func _create_roots() -> void:
 	gameplay_root.y_sort_enabled = true
 	add_child(gameplay_root)
 
+	darkness_root = Node2D.new()
+	darkness_root.name = "Darkness"
+	add_child(darkness_root)
+
 
 func _generate_layout() -> void:
 	grid.clear()
 	rooms.clear()
+	room_archetypes.clear()
+	floor_cells.clear()
 
 	for y in range(GRID_HEIGHT):
 		var row: Array[int] = []
@@ -186,31 +276,331 @@ func _generate_layout() -> void:
 			row.append(WALL_TILE)
 		grid.append(row)
 
-	var entrance_room: Rect2i = Rect2i(4, GRID_HEIGHT / 2 - 3, 8, 6)
-	rooms.append(entrance_room)
-	_carve_room_feature(entrance_room, "rect")
+	var layout: Dictionary = _generate_logical_layout()
+	var logical_rooms: Dictionary = layout.get("rooms", {})
+	var room_cells: Array[Vector2i] = layout.get("room_cells", [])
+	var edges: Array = layout.get("edges", [])
+	var next_room_archetypes: Dictionary = _assign_room_archetypes(room_cells, edges, logical_rooms)
 
-	var main_room: Rect2i = entrance_room
-	var main_direction: Vector2i = Vector2i.RIGHT
-	var main_steps: int = 11 + mini(depth, 5)
-	for _step_index in range(main_steps):
-		var result: Dictionary = _try_attach_feature_from_room(main_room, _get_main_path_directions(main_direction), false)
-		if result.is_empty():
-			break
-		main_room = result.get("room", main_room)
-		main_direction = result.get("direction", main_direction)
+	for room_cell in room_cells:
+		var room_key: String = _logical_key(room_cell)
+		var room: Rect2i = logical_rooms.get(room_key, Rect2i())
+		rooms.append(room)
+		room_archetypes[_room_key(room)] = str(next_room_archetypes.get(room_key, "storage_room"))
+		var room_shape: String = "rect" if room_cells.find(room_cell) == 0 else _roll_room_shape()
+		_carve_room_feature(room, room_shape)
 
-	var side_branch_count: int = 5 + mini(depth, 3)
-	for _branch_index in range(side_branch_count):
-		if rooms.size() <= 2:
-			break
-		var branch_room_index: int = rng.randi_range(1, rooms.size() - 2)
-		var branch_room: Rect2i = rooms[branch_room_index]
-		_try_attach_feature_from_room(branch_room, _get_side_branch_directions(), true)
-
-	_carve_loop_connections(1 + int(depth > 3))
+	for edge_variant in edges:
+		var edge: Array = edge_variant
+		if edge.size() < 2:
+			continue
+		var from_cell: Vector2i = edge[0]
+		var to_cell: Vector2i = edge[1]
+		var from_room: Rect2i = logical_rooms.get(_logical_key(from_cell), Rect2i())
+		var to_room: Rect2i = logical_rooms.get(_logical_key(to_cell), Rect2i())
+		_carve_logical_corridor(from_cell, from_room, to_cell, to_room)
 
 	dungeon_size = Vector2(GRID_WIDTH * TILE_SIZE, GRID_HEIGHT * TILE_SIZE)
+
+
+func _rebuild_floor_cells() -> void:
+	floor_cells.clear()
+	for y in range(GRID_HEIGHT):
+		for x in range(GRID_WIDTH):
+			if int(grid[y][x]) == FLOOR_TILE:
+				floor_cells.append(Vector2i(x, y))
+
+
+func _generate_logical_layout() -> Dictionary:
+	var start_cell: Vector2i = Vector2i(0, LOGICAL_GRID_HEIGHT / 2)
+	var room_cells: Array[Vector2i] = [start_cell]
+	var used_map: Dictionary = {_logical_key(start_cell): true}
+	var edges: Array[Array] = []
+
+	var current_cell: Vector2i = start_cell
+	var main_room_target: int = 6 + mini(depth, 3)
+	for _step_index in range(main_room_target - 1):
+		var next_cell: Vector2i = _pick_next_logical_cell(current_cell, used_map, true)
+		if next_cell == Vector2i(-1, -1):
+			next_cell = _pick_next_logical_cell_from_any(room_cells, used_map, true)
+			if next_cell == Vector2i(-1, -1):
+				break
+			current_cell = room_cells[rng.randi_range(0, room_cells.size() - 1)]
+		edges.append([current_cell, next_cell])
+		room_cells.append(next_cell)
+		used_map[_logical_key(next_cell)] = true
+		current_cell = next_cell
+
+	var branch_target: int = 4 + mini(depth, 4)
+	var branch_attempts: int = branch_target * 6
+	while branch_target > 0 and branch_attempts > 0:
+		branch_attempts -= 1
+		var source_cell: Vector2i = room_cells[rng.randi_range(0, room_cells.size() - 1)]
+		var branch_cell: Vector2i = _pick_next_logical_cell(source_cell, used_map, false)
+		if branch_cell == Vector2i(-1, -1):
+			continue
+		edges.append([source_cell, branch_cell])
+		room_cells.append(branch_cell)
+		used_map[_logical_key(branch_cell)] = true
+		branch_target -= 1
+
+	var extra_edges_added: int = 0
+	var extra_edge_budget: int = 1 + int(depth > 2)
+	for room_cell in room_cells:
+		if extra_edges_added >= extra_edge_budget:
+			break
+		var connected_neighbors: Array[Vector2i] = _get_connected_logical_neighbors(room_cell, edges)
+		for neighbor in _get_logical_neighbors(room_cell, false):
+			if not used_map.has(_logical_key(neighbor)):
+				continue
+			if connected_neighbors.has(neighbor):
+				continue
+			if rng.randf() > 0.22:
+				continue
+			edges.append([room_cell, neighbor])
+			extra_edges_added += 1
+			break
+
+	var logical_rooms: Dictionary = {}
+	for room_cell in room_cells:
+		logical_rooms[_logical_key(room_cell)] = _make_logical_room_rect(room_cell)
+
+	return {
+		"rooms": logical_rooms,
+		"room_cells": room_cells,
+		"edges": edges
+	}
+
+
+func _logical_key(cell: Vector2i) -> String:
+	return "%d,%d" % [cell.x, cell.y]
+
+
+func _pick_next_logical_cell(from_cell: Vector2i, used_map: Dictionary, prefer_forward: bool) -> Vector2i:
+	var neighbors: Array[Vector2i] = _get_logical_neighbors(from_cell, prefer_forward)
+	for neighbor in neighbors:
+		if not used_map.has(_logical_key(neighbor)):
+			return neighbor
+	return Vector2i(-1, -1)
+
+
+func _pick_next_logical_cell_from_any(room_cells: Array[Vector2i], used_map: Dictionary, prefer_forward: bool) -> Vector2i:
+	var candidates: Array[Vector2i] = room_cells.duplicate()
+	candidates.shuffle()
+	for candidate in candidates:
+		var next_cell: Vector2i = _pick_next_logical_cell(candidate, used_map, prefer_forward)
+		if next_cell != Vector2i(-1, -1):
+			return next_cell
+	return Vector2i(-1, -1)
+
+
+func _get_logical_neighbors(cell: Vector2i, prefer_forward: bool) -> Array[Vector2i]:
+	var neighbors: Array[Vector2i] = []
+	var directions: Array[Vector2i] = [
+		Vector2i.RIGHT,
+		Vector2i.DOWN,
+		Vector2i.UP,
+		Vector2i.LEFT
+	]
+	if not prefer_forward:
+		directions = ORTHOGONAL_DIRECTIONS.duplicate()
+		directions.shuffle()
+	for direction in directions:
+		var neighbor: Vector2i = cell + direction
+		if neighbor.x < 0 or neighbor.y < 0 or neighbor.x >= LOGICAL_GRID_WIDTH or neighbor.y >= LOGICAL_GRID_HEIGHT:
+			continue
+		neighbors.append(neighbor)
+	return neighbors
+
+
+func _get_connected_logical_neighbors(cell: Vector2i, edges: Array) -> Array[Vector2i]:
+	var neighbors: Array[Vector2i] = []
+	for edge_variant in edges:
+		var edge: Array = edge_variant
+		if edge.size() < 2:
+			continue
+		if edge[0] == cell and not neighbors.has(edge[1]):
+			neighbors.append(edge[1])
+		elif edge[1] == cell and not neighbors.has(edge[0]):
+			neighbors.append(edge[0])
+	return neighbors
+
+
+func _make_logical_room_rect(cell: Vector2i) -> Rect2i:
+	var cell_origin: Vector2i = Vector2i(
+		LOGICAL_MARGIN_X + cell.x * LOGICAL_CELL_WIDTH,
+		LOGICAL_MARGIN_Y + cell.y * LOGICAL_CELL_HEIGHT
+	)
+	var room_width: int = rng.randi_range(6, 9)
+	var room_height: int = rng.randi_range(5, 8)
+	room_width = mini(room_width, LOGICAL_CELL_WIDTH - 2)
+	room_height = mini(room_height, LOGICAL_CELL_HEIGHT - 2)
+	var max_offset_x: int = maxi(1, LOGICAL_CELL_WIDTH - room_width - 1)
+	var max_offset_y: int = maxi(1, LOGICAL_CELL_HEIGHT - room_height - 1)
+	var room_x: int = cell_origin.x + rng.randi_range(1, max_offset_x)
+	var room_y: int = cell_origin.y + rng.randi_range(1, max_offset_y)
+	return Rect2i(room_x, room_y, room_width, room_height)
+
+
+func _carve_logical_corridor(from_cell: Vector2i, from_room: Rect2i, to_cell: Vector2i, to_room: Rect2i) -> void:
+	var direction: Vector2i = to_cell - from_cell
+	if direction.x > 0:
+		var corridor_y: int = _logical_row_center_tile(from_cell.y)
+		var start_x: int = from_room.position.x + from_room.size.x - 1
+		var end_x: int = to_room.position.x
+		_carve_corridor_segment(Vector2i(start_x, corridor_y), Vector2i(end_x, corridor_y), 2)
+	elif direction.x < 0:
+		var corridor_y_left: int = _logical_row_center_tile(from_cell.y)
+		var start_x_left: int = from_room.position.x
+		var end_x_left: int = to_room.position.x + to_room.size.x - 1
+		_carve_corridor_segment(Vector2i(start_x_left, corridor_y_left), Vector2i(end_x_left, corridor_y_left), 2)
+	elif direction.y > 0:
+		var corridor_x: int = _logical_column_center_tile(from_cell.x)
+		var start_y: int = from_room.position.y + from_room.size.y - 1
+		var end_y: int = to_room.position.y
+		_carve_corridor_segment(Vector2i(corridor_x, start_y), Vector2i(corridor_x, end_y), 2)
+	elif direction.y < 0:
+		var corridor_x_up: int = _logical_column_center_tile(from_cell.x)
+		var start_y_up: int = from_room.position.y
+		var end_y_up: int = to_room.position.y + to_room.size.y - 1
+		_carve_corridor_segment(Vector2i(corridor_x_up, start_y_up), Vector2i(corridor_x_up, end_y_up), 2)
+
+
+func _logical_row_center_tile(row: int) -> int:
+	return LOGICAL_MARGIN_Y + row * LOGICAL_CELL_HEIGHT + LOGICAL_CELL_HEIGHT / 2
+
+
+func _logical_column_center_tile(column: int) -> int:
+	return LOGICAL_MARGIN_X + column * LOGICAL_CELL_WIDTH + LOGICAL_CELL_WIDTH / 2
+
+
+func _carve_corridor_segment(from_cell: Vector2i, to_cell: Vector2i, width: int) -> void:
+	if from_cell.x == to_cell.x:
+		var top_y: int = mini(from_cell.y, to_cell.y)
+		var corridor_rect: Rect2i = Rect2i(from_cell.x - width / 2, top_y, width, absi(to_cell.y - from_cell.y) + 1)
+		_carve_rect(corridor_rect)
+		return
+
+	var left_x: int = mini(from_cell.x, to_cell.x)
+	var corridor_rect_horizontal: Rect2i = Rect2i(left_x, from_cell.y - width / 2, absi(to_cell.x - from_cell.x) + 1, width)
+	_carve_rect(corridor_rect_horizontal)
+
+
+func _assign_room_archetypes(room_cells: Array[Vector2i], edges: Array, logical_rooms: Dictionary) -> Dictionary:
+	var archetypes: Dictionary = {}
+	if room_cells.is_empty():
+		return archetypes
+
+	var distances: Dictionary = _build_logical_distance_map(room_cells[0], edges)
+	var degrees: Dictionary = {}
+	for cell in room_cells:
+		degrees[_logical_key(cell)] = _get_connected_logical_neighbors(cell, edges).size()
+
+	var farthest_cell: Vector2i = room_cells[0]
+	var farthest_distance: int = -1
+	for cell in room_cells:
+		var cell_distance: int = int(distances.get(_logical_key(cell), -1))
+		if cell_distance > farthest_distance:
+			farthest_distance = cell_distance
+			farthest_cell = cell
+
+	for cell in room_cells:
+		archetypes[_logical_key(cell)] = "storage_room"
+
+	archetypes[_logical_key(room_cells[0])] = "entry"
+	archetypes[_logical_key(farthest_cell)] = "chest_room"
+
+	var dead_end_candidates: Array[Vector2i] = []
+	var hall_candidates: Array[Vector2i] = []
+	var deep_candidates: Array[Vector2i] = []
+	for cell in room_cells:
+		if cell == room_cells[0] or cell == farthest_cell:
+			continue
+		var degree: int = int(degrees.get(_logical_key(cell), 0))
+		if degree <= 1:
+			dead_end_candidates.append(cell)
+		if degree >= 2:
+			hall_candidates.append(cell)
+		deep_candidates.append(cell)
+
+	dead_end_candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return int(distances.get(_logical_key(a), 0)) > int(distances.get(_logical_key(b), 0))
+	)
+	hall_candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		var degree_a: int = int(degrees.get(_logical_key(a), 0))
+		var degree_b: int = int(degrees.get(_logical_key(b), 0))
+		if degree_a == degree_b:
+			return int(distances.get(_logical_key(a), 0)) > int(distances.get(_logical_key(b), 0))
+		return degree_a > degree_b
+	)
+	deep_candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return int(distances.get(_logical_key(a), 0)) > int(distances.get(_logical_key(b), 0))
+	)
+
+	if not dead_end_candidates.is_empty():
+		archetypes[_logical_key(dead_end_candidates[0])] = "dead_end_loot_nook"
+
+	for cell in hall_candidates:
+		if str(archetypes.get(_logical_key(cell), "")) == "storage_room":
+			archetypes[_logical_key(cell)] = "torch_hall"
+			break
+
+	for cell in deep_candidates:
+		var cell_key: String = _logical_key(cell)
+		if str(archetypes.get(cell_key, "")) == "storage_room":
+			archetypes[cell_key] = "rat_nest"
+			break
+
+	for cell in deep_candidates:
+		var bone_key: String = _logical_key(cell)
+		if str(archetypes.get(bone_key, "")) == "storage_room":
+			archetypes[bone_key] = "bone_room"
+			break
+
+	for cell in room_cells:
+		var room_key: String = _logical_key(cell)
+		if str(archetypes.get(room_key, "")) != "storage_room":
+			continue
+		if rng.randf() < 0.45:
+			archetypes[room_key] = "bone_room"
+		elif rng.randf() < 0.35:
+			archetypes[room_key] = "rat_nest"
+
+	for logical_key in archetypes.keys():
+		var room: Rect2i = logical_rooms.get(logical_key, Rect2i())
+		if room.size.x <= 5 or room.size.y <= 4:
+			var compact_archetype: String = str(archetypes[logical_key])
+			if compact_archetype == "torch_hall":
+				archetypes[logical_key] = "storage_room"
+			elif compact_archetype == "rat_nest" and rng.randf() < 0.5:
+				archetypes[logical_key] = "bone_room"
+
+	return archetypes
+
+
+func _build_logical_distance_map(start_cell: Vector2i, edges: Array) -> Dictionary:
+	var distances: Dictionary = {_logical_key(start_cell): 0}
+	var queue: Array[Vector2i] = [start_cell]
+	var queue_index: int = 0
+	while queue_index < queue.size():
+		var current: Vector2i = queue[queue_index]
+		queue_index += 1
+		var current_distance: int = int(distances.get(_logical_key(current), 0))
+		for neighbor in _get_connected_logical_neighbors(current, edges):
+			var neighbor_key: String = _logical_key(neighbor)
+			if distances.has(neighbor_key):
+				continue
+			distances[neighbor_key] = current_distance + 1
+			queue.append(neighbor)
+	return distances
+
+
+func _room_key(room: Rect2i) -> String:
+	return "%d,%d:%d,%d" % [room.position.x, room.position.y, room.size.x, room.size.y]
+
+
+func _get_room_archetype(room: Rect2i) -> String:
+	return str(room_archetypes.get(_room_key(room), "storage_room"))
 
 
 func _room_overlaps(candidate: Rect2i) -> bool:
@@ -243,7 +633,7 @@ func _try_attach_feature() -> bool:
 	var corridor_length: int = rng.randi_range(2, 7)
 	var corridor_width: int = 2 + int(rng.randf() > 0.45)
 	var corridor: Rect2i = _make_corridor_rect(floor_cell + direction, direction, corridor_length, corridor_width)
-	if not _can_carve_rect(corridor, false):
+	if not _can_carve_corridor(corridor, direction):
 		return false
 
 	var corridor_end: Vector2i = _corridor_end_cell(corridor, direction)
@@ -273,7 +663,7 @@ func _try_attach_feature_from_room(source_room: Rect2i, directions: Array[Vector
 			var corridor_length: int = rng.randi_range(3, 6)
 			var corridor_width: int = 2 + int(rng.randf() > 0.75)
 			var corridor: Rect2i = _make_corridor_rect(floor_cell + direction, direction, corridor_length, corridor_width)
-			if not _can_carve_rect(corridor, false):
+			if not _can_carve_corridor(corridor, direction):
 				continue
 
 			var corridor_end: Vector2i = _corridor_end_cell(corridor, direction)
@@ -440,6 +830,51 @@ func _can_carve_rect(rect: Rect2i, require_padding: bool = true) -> bool:
 				return false
 
 	return true
+
+
+func _can_carve_corridor(rect: Rect2i, direction: Vector2i) -> bool:
+	if not _can_carve_rect(rect, false):
+		return false
+
+	var expanded_rect: Rect2i = _make_corridor_clearance_rect(rect, direction)
+	for y in range(expanded_rect.position.y, expanded_rect.position.y + expanded_rect.size.y):
+		for x in range(expanded_rect.position.x, expanded_rect.position.x + expanded_rect.size.x):
+			if x < 0 or y < 0 or x >= GRID_WIDTH or y >= GRID_HEIGHT:
+				return false
+			if int(grid[y][x]) != FLOOR_TILE:
+				continue
+			if _is_allowed_corridor_contact_cell(rect, direction, x, y):
+				continue
+			return false
+
+	return true
+
+
+func _make_corridor_clearance_rect(rect: Rect2i, direction: Vector2i) -> Rect2i:
+	if direction.x != 0:
+		return Rect2i(
+			rect.position.x,
+			rect.position.y - MIN_CARVE_CLEARANCE,
+			rect.size.x,
+			rect.size.y + MIN_CARVE_CLEARANCE * 2
+		)
+
+	return Rect2i(
+		rect.position.x - MIN_CARVE_CLEARANCE,
+		rect.position.y,
+		rect.size.x + MIN_CARVE_CLEARANCE * 2,
+		rect.size.y
+	)
+
+
+func _is_allowed_corridor_contact_cell(rect: Rect2i, direction: Vector2i, x: int, y: int) -> bool:
+	if direction.x > 0:
+		return x < rect.position.x and y >= rect.position.y - 1 and y <= rect.position.y + rect.size.y
+	if direction.x < 0:
+		return x >= rect.position.x + rect.size.x and y >= rect.position.y - 1 and y <= rect.position.y + rect.size.y
+	if direction.y > 0:
+		return y < rect.position.y and x >= rect.position.x - 1 and x <= rect.position.x + rect.size.x
+	return y >= rect.position.y + rect.size.y and x >= rect.position.x - 1 and x <= rect.position.x + rect.size.x
 
 
 func _carve_rect(rect: Rect2i) -> void:
@@ -1131,29 +1566,140 @@ func _draw_torch_light(wall_cell: Vector2i, center: Vector2) -> void:
 
 
 func _draw_floor_props() -> void:
-	var prop_budget: int = 18 + rooms.size()
-	var placed: int = 0
-	var attempts: int = 0
-	while placed < prop_budget and attempts < prop_budget * 8:
-		attempts += 1
-		var room: Rect2i = rooms[rng.randi_range(0, rooms.size() - 1)]
+	for room_index in range(rooms.size()):
+		var room: Rect2i = rooms[room_index]
 		if room.size.x < 5 or room.size.y < 4:
 			continue
+		_draw_room_archetype_decor(room, _get_room_archetype(room), room_index == 0)
+
+
+func _draw_room_archetype_decor(room: Rect2i, archetype: String, is_spawn_room: bool) -> void:
+	if is_spawn_room:
+		_draw_room_props_from_pool(room, ["barrel", "rubble"], 1)
+		return
+
+	match archetype:
+		"chest_room":
+			_draw_room_torches(room, 2)
+			_draw_room_props_from_pool(room, ["barrel", "barrel", "rubble"], 3)
+			_draw_room_feature_prop(room, "coin_stash", "lower_left")
+			_draw_room_feature_prop(room, "coin_stash", "lower_right")
+		"dead_end_loot_nook":
+			_draw_room_torches(room, 1)
+			_draw_room_props_from_pool(room, ["gold", "barrel"], 2)
+		"rat_nest":
+			_draw_room_feature_prop(room, "rat_nest", "center")
+			_draw_room_feature_prop(room, "rat_nest", "upper_left")
+			_draw_room_feature_prop(room, "rat_nest", "lower_right")
+			_draw_room_props_from_pool(room, ["bones", "rubble", "rubble", "bones"], 4 + int(depth > 2))
+		"bone_room":
+			_draw_room_feature_prop(room, "bones", "center")
+			_draw_room_feature_prop(room, "bones", "upper_right")
+			_draw_room_props_from_pool(room, ["bones", "bones", "rubble"], 4)
+		"torch_hall":
+			_draw_room_torches(room, 2 + int(room.size.x + room.size.y > 11))
+			_draw_room_props_from_pool(room, ["rubble"], 1)
+		_:
+			_draw_room_props_from_pool(room, ["barrel", "barrel", "rubble"], 3)
+
+
+func _draw_room_props_from_pool(room: Rect2i, prop_pool: Array[String], desired_count: int) -> void:
+	var placed: int = 0
+	var attempts: int = 0
+	while placed < desired_count and attempts < desired_count * 10:
+		attempts += 1
 		var cell: Vector2i = Vector2i(
 			rng.randi_range(room.position.x + 1, room.position.x + room.size.x - 2),
 			rng.randi_range(room.position.y + 1, room.position.y + room.size.y - 2)
 		)
 		if not _can_place_decor_on_floor(cell):
 			continue
-		var prop_roll: float = rng.randf()
-		if prop_roll < 0.36:
-			_draw_rubble(cell)
-		elif prop_roll < 0.68:
-			_draw_bones(cell)
-		else:
-			_draw_barrel(cell)
+		if not _is_far_from_existing_decor(cell, 3):
+			continue
+		var prop_kind: String = prop_pool[rng.randi_range(0, prop_pool.size() - 1)]
+		_draw_prop_kind(prop_kind, cell)
 		decor_cells.append(cell)
 		placed += 1
+
+
+func _draw_room_feature_prop(room: Rect2i, prop_kind: String, anchor: String) -> void:
+	var cell: Vector2i = _get_room_anchor_cell(room, anchor)
+	if not _can_place_decor_on_floor(cell):
+		return
+	if not _is_far_from_existing_decor(cell, 2):
+		return
+	_draw_prop_kind(prop_kind, cell)
+	decor_cells.append(cell)
+
+
+func _draw_prop_kind(prop_kind: String, cell: Vector2i) -> void:
+	match prop_kind:
+		"barrel":
+			_draw_barrel(cell)
+		"bones":
+			_draw_bones(cell)
+		"gold", "coin_stash":
+			_draw_coin_stash(cell)
+		"rat_nest":
+			_draw_rat_nest(cell)
+		_:
+			_draw_rubble(cell)
+
+
+func _draw_room_torches(room: Rect2i, desired_count: int) -> void:
+	var wall_candidates: Array[Vector2i] = []
+	for x in range(room.position.x + 1, room.position.x + room.size.x - 1):
+		var top_wall: Vector2i = Vector2i(x, room.position.y - 1)
+		var bottom_wall: Vector2i = Vector2i(x, room.position.y + room.size.y)
+		if top_wall.y >= 1 and int(grid[top_wall.y][top_wall.x]) == WALL_TILE:
+			wall_candidates.append(top_wall)
+		if bottom_wall.y < GRID_HEIGHT - 1 and int(grid[bottom_wall.y][bottom_wall.x]) == WALL_TILE:
+			wall_candidates.append(bottom_wall)
+
+	var placed: int = 0
+	while placed < desired_count and not wall_candidates.is_empty():
+		var candidate_index: int = rng.randi_range(0, wall_candidates.size() - 1)
+		var cell: Vector2i = wall_candidates[candidate_index]
+		wall_candidates.remove_at(candidate_index)
+		if not _is_far_from_existing_decor(cell, 4):
+			continue
+		_draw_torch(cell)
+		decor_cells.append(cell)
+		placed += 1
+
+
+func _draw_coin_stash(cell: Vector2i) -> void:
+	var origin: Vector2 = _cell_to_world(cell)
+	var shadow: Polygon2D = _make_ellipse_polygon(origin + Vector2(0, 9), Vector2(16, 5), Color(0.04, 0.03, 0.02, 0.18), 16)
+	decor_root.add_child(shadow)
+	for pile_index in range(4):
+		var offset: Vector2 = Vector2(-8 + pile_index * 5, rng.randf_range(-1.0, 4.0))
+		var coin: Polygon2D = _make_rect_polygon(Rect2(origin + offset + Vector2(-2, -2), Vector2(5, 4)), Color(0.86, 0.66, 0.16, 0.96))
+		decor_root.add_child(coin)
+		var shine: Polygon2D = _make_rect_polygon(Rect2(origin + offset + Vector2(-1, -1), Vector2(2, 1)), Color(1.0, 0.92, 0.48, 0.55))
+		decor_root.add_child(shine)
+
+
+func _draw_rat_nest(cell: Vector2i) -> void:
+	var origin: Vector2 = _cell_to_world(cell)
+	var shadow: Polygon2D = _make_ellipse_polygon(origin + Vector2(0, 10), Vector2(20, 7), Color(0.03, 0.025, 0.02, 0.22), 18)
+	decor_root.add_child(shadow)
+	var nest_base: Polygon2D = _make_ellipse_polygon(origin + Vector2(0, 4), Vector2(18, 9), Color(0.20, 0.13, 0.08, 0.92), 18)
+	decor_root.add_child(nest_base)
+	var nest_inner: Polygon2D = _make_ellipse_polygon(origin + Vector2(0, 4), Vector2(11, 5), Color(0.13, 0.08, 0.05, 0.90), 18)
+	decor_root.add_child(nest_inner)
+	for straw_index in range(8):
+		var straw_offset: Vector2 = Vector2(rng.randi_range(-10, 10), rng.randi_range(-2, 5))
+		var straw_root: Node2D = Node2D.new()
+		straw_root.position = origin + straw_offset
+		straw_root.rotation = rng.randf_range(-0.7, 0.7)
+		decor_root.add_child(straw_root)
+		var straw: Polygon2D = _make_rect_polygon(Rect2(Vector2(-2, 0), Vector2(5, 1)), Color(0.40, 0.30, 0.13, 0.54))
+		straw_root.add_child(straw)
+	var egg_a: Polygon2D = _make_ellipse_polygon(origin + Vector2(-5, 2), Vector2(3, 4), Color(0.72, 0.68, 0.55, 0.90), 12)
+	var egg_b: Polygon2D = _make_ellipse_polygon(origin + Vector2(4, 0), Vector2(3, 4), Color(0.72, 0.68, 0.55, 0.90), 12)
+	decor_root.add_child(egg_a)
+	decor_root.add_child(egg_b)
 
 
 func _draw_rubble(cell: Vector2i) -> void:
@@ -1245,6 +1791,7 @@ func _draw_barrel(cell: Vector2i) -> void:
 	var origin: Vector2 = _cell_to_world(cell)
 	var shadow: Polygon2D = _make_ellipse_polygon(origin + Vector2(0, 11), Vector2(17, 6), Color(0.02, 0.018, 0.014, 0.30), 18)
 	decor_root.add_child(shadow)
+	_add_prop_collision(cell, Vector2(16, 10), Vector2(0, 6))
 
 	var body: Polygon2D = Polygon2D.new()
 	body.polygon = PackedVector2Array([
@@ -1454,6 +2001,15 @@ func _add_collision_run(start_x: int, end_x: int, y: int) -> void:
 	collision_body.add_child(collision)
 
 
+func _add_prop_collision(cell: Vector2i, size: Vector2, offset: Vector2 = Vector2.ZERO) -> void:
+	var shape: RectangleShape2D = RectangleShape2D.new()
+	shape.size = size
+	var collision: CollisionShape2D = CollisionShape2D.new()
+	collision.shape = shape
+	collision.position = _cell_to_world(cell) + offset
+	collision_body.add_child(collision)
+
+
 func _spawn_gameplay() -> void:
 	if rooms.is_empty():
 		return
@@ -1463,8 +2019,12 @@ func _spawn_gameplay() -> void:
 	var down_stairs_cell: Vector2i = _room_center(stairs_room)
 	var up_stairs_cell: Vector2i = _room_cell_with_offset(spawn_room, Vector2i(2, 0))
 	var player_spawn_cell: Vector2i = _get_player_spawn_cell(spawn_room, up_stairs_cell, down_stairs_cell)
+	gameplay_down_stairs_cell = down_stairs_cell
+	gameplay_up_stairs_cell = up_stairs_cell
+	gameplay_player_spawn_cell = player_spawn_cell
 	player = PlayerScene.instantiate()
 	player.global_position = _cell_to_world(player_spawn_cell)
+	player.z_index = 30
 	gameplay_root.add_child(player)
 	player.attack_requested.connect(_on_player_attack_requested)
 	player.interacted.connect(_on_player_interacted)
@@ -1473,13 +2033,12 @@ func _spawn_gameplay() -> void:
 
 	var camera: Camera2D = Camera2D.new()
 	camera.name = "Camera2D"
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 8.0
+	camera.position_smoothing_enabled = false
 	camera.limit_left = 0
 	camera.limit_top = 0
 	camera.limit_right = int(dungeon_size.x)
 	camera.limit_bottom = int(dungeon_size.y)
-	camera.zoom = Vector2(1.05, 1.05)
+	camera.zoom = Vector2.ONE
 	player.add_child(camera)
 	camera.make_current()
 
@@ -1501,33 +2060,62 @@ func _spawn_gameplay() -> void:
 
 
 func _spawn_chests() -> void:
-	var chest_count: int = mini(2, maxi(0, rooms.size() - 2))
-	for chest_index in range(chest_count):
-		var room_index: int = rooms.size() - 2 - chest_index
-		var room: Rect2i = rooms[room_index]
-		var chest: Node2D = ChestScene.instantiate()
-		chest.global_position = _cell_to_world(Vector2i(room.position.x + 1, room.position.y + 1))
-		chest.set("chest_id", "depth_%d_chest_%d" % [depth, chest_index])
-		chest.set("speaker_name", "Old Dungeon Chest")
-		chest.set("item_name", "Minor Potion" if depth > 1 else "Trail Ration")
-		chest.set("item_kind", "consumable")
-		chest.set("closed_message", "Dusty hinges creak. Something useful is inside.")
-		gameplay_root.add_child(chest)
+	var chest_index: int = 0
+	for room in rooms:
+		var archetype: String = _get_room_archetype(room)
+		if archetype == "entry":
+			continue
+		if archetype == "chest_room":
+			chest_index += 1
+			_spawn_room_chest(room, chest_index, "center", "Old Treasure Chest", "Minor Potion" if depth > 1 else "Trail Ration", "consumable", "Dusty hinges creak. Something useful is inside.")
+		elif archetype == "rat_nest" and rng.randf() < 0.40:
+			chest_index += 1
+			_spawn_room_chest(room, chest_index, "upper_right", "Guarded Nest Cache", "Trail Ration" if depth < 3 else "Minor Potion", "consumable", "A scavenged cache sits half-buried in the nest.")
+		elif archetype == "dead_end_loot_nook":
+			_spawn_room_pickup(room, {
+				"name": "Gold Cache",
+				"kind": "gold",
+				"count": 6 + depth * 2,
+				"visual": "gold",
+				"speaker": "Loose Coins",
+				"message": "A forgotten purse glitters in the dark."
+			}, "lower_left")
+			if rng.randf() < 0.55:
+				_spawn_room_pickup(room, {
+					"name": "Minor Potion",
+					"kind": "consumable",
+					"count": 1,
+					"visual": "potion",
+					"speaker": "Forgotten Supply",
+					"message": "A dusty potion has somehow survived."
+				}, "upper_right")
+
+
+func _spawn_room_chest(room: Rect2i, chest_index: int, anchor: String, speaker_name: String, item_name: String, item_kind: String, closed_message: String) -> void:
+	var chest: Node2D = ChestScene.instantiate()
+	var chest_cell: Vector2i = _get_room_spawn_cell(room, anchor)
+	chest.global_position = _cell_to_world(chest_cell)
+	chest.set("chest_id", "depth_%d_chest_%d" % [depth, chest_index])
+	chest.set("speaker_name", speaker_name)
+	chest.set("item_name", item_name)
+	chest.set("item_kind", item_kind)
+	chest.set("closed_message", closed_message)
+	gameplay_root.add_child(chest)
 
 
 func _spawn_enemies() -> void:
 	var enemy_counter: int = 0
-	for room_index in range(1, rooms.size() - 1):
+	for room_index in range(1, rooms.size()):
 		var room: Rect2i = rooms[room_index]
-		var enemies_in_room: int = 1 + int(depth > 1 and rng.randf() > 0.45)
+		var archetype: String = _get_room_archetype(room)
+		var enemies_in_room: int = _get_room_enemy_count(archetype)
 		for enemy_index in range(enemies_in_room):
 			enemy_counter += 1
 			var enemy: Node2D = RatScene.instantiate()
-			var spawn_x: int = rng.randi_range(room.position.x + 1, room.position.x + room.size.x - 2)
-			var spawn_y: int = rng.randi_range(room.position.y + 1, room.position.y + room.size.y - 2)
+			var spawn_cell: Vector2i = _get_room_enemy_spawn_cell(room, archetype, enemy_index)
 			var enemy_rarity: String = _roll_enemy_rarity()
 			var rarity_stats: Dictionary = _get_enemy_rarity_stats(enemy_rarity)
-			enemy.global_position = _cell_to_world(Vector2i(spawn_x, spawn_y))
+			enemy.global_position = _cell_to_world(spawn_cell)
 			enemy.set("enemy_id", "dungeon_%d_rat_%d" % [depth, enemy_counter])
 			enemy.set("enemy_rarity", enemy_rarity)
 			enemy.set("enemy_name", _get_enemy_display_name("Dungeon Rat", enemy_rarity))
@@ -1545,6 +2133,139 @@ func _spawn_enemies() -> void:
 				enemy.connect("defeated", Callable(self, "_on_enemy_defeated"))
 			if enemy.has_signal("attacked_player"):
 				enemy.connect("attacked_player", Callable(self, "_on_enemy_attacked_player"))
+
+
+func _get_room_enemy_count(archetype: String) -> int:
+	match archetype:
+		"entry":
+			return 0
+		"dead_end_loot_nook":
+			return 0 if rng.randf() < 0.55 else 1
+		"torch_hall":
+			return 1
+		"bone_room":
+			return 1 + int(depth > 2 and rng.randf() > 0.55)
+		"chest_room":
+			return 1 + int(depth > 1)
+		"rat_nest":
+			return 2 + int(depth > 1) + int(depth > 3) + int(depth > 5 and rng.randf() > 0.35)
+		_:
+			return 1 + int(depth > 1 and rng.randf() > 0.5)
+
+
+func _get_room_enemy_spawn_cell(room: Rect2i, archetype: String, enemy_index: int) -> Vector2i:
+	if archetype == "rat_nest":
+		var nest_anchors: Array[String] = ["center", "upper_left", "lower_right", "upper_right"]
+		var anchor: String = nest_anchors[enemy_index % nest_anchors.size()]
+		var anchor_cell: Vector2i = _get_room_anchor_cell(room, anchor)
+		var offsets: Array[Vector2i] = [
+			Vector2i(0, 0),
+			Vector2i(1, 0),
+			Vector2i(-1, 0),
+			Vector2i(0, 1),
+			Vector2i(0, -1),
+			Vector2i(1, 1),
+			Vector2i(-1, 1)
+		]
+		for offset in offsets:
+			var candidate: Vector2i = anchor_cell + offset
+			if _is_room_interior_cell(room, candidate):
+				return candidate
+		return _clamp_cell_to_room(room, anchor_cell)
+
+	return _get_random_room_floor_cell(room, 3, enemy_index)
+
+
+func _get_random_room_floor_cell(room: Rect2i, min_distance_from_decor: int, _salt: int) -> Vector2i:
+	var attempts: int = 0
+	while attempts < 20:
+		attempts += 1
+		var cell: Vector2i = Vector2i(
+			rng.randi_range(room.position.x + 1, room.position.x + room.size.x - 2),
+			rng.randi_range(room.position.y + 1, room.position.y + room.size.y - 2)
+		)
+		if not _can_place_decor_on_floor(cell):
+			continue
+		if not _is_far_from_existing_decor(cell, min_distance_from_decor):
+			continue
+		return cell
+	return _get_room_anchor_cell(room, "center")
+
+
+func _get_room_spawn_cell(room: Rect2i, anchor: String) -> Vector2i:
+	var anchor_preferences: Array[String] = [anchor, "center", "upper_right", "lower_right", "upper_left", "lower_left"]
+	var tried_cells: Array[Vector2i] = []
+	for anchor_name in anchor_preferences:
+		var base_cell: Vector2i = _get_room_anchor_cell(room, anchor_name)
+		var offsets: Array[Vector2i] = [
+			Vector2i.ZERO,
+			Vector2i(1, 0),
+			Vector2i(-1, 0),
+			Vector2i(0, 1),
+			Vector2i(0, -1),
+			Vector2i(1, 1),
+			Vector2i(-1, 1),
+			Vector2i(1, -1),
+			Vector2i(-1, -1)
+		]
+		for offset in offsets:
+			var candidate: Vector2i = _clamp_cell_to_room(room, base_cell + offset)
+			if tried_cells.has(candidate):
+				continue
+			tried_cells.append(candidate)
+			if not _is_room_interior_cell(room, candidate):
+				continue
+			if _is_reserved_gameplay_cell(candidate):
+				continue
+			return candidate
+	return _clamp_cell_to_room(room, _get_room_anchor_cell(room, anchor))
+
+
+func _is_reserved_gameplay_cell(cell: Vector2i) -> bool:
+	return cell == gameplay_up_stairs_cell or cell == gameplay_down_stairs_cell or cell == gameplay_player_spawn_cell
+
+
+func _is_room_interior_cell(room: Rect2i, cell: Vector2i) -> bool:
+	if cell.x < room.position.x + 1 or cell.y < room.position.y + 1:
+		return false
+	if cell.x > room.position.x + room.size.x - 2 or cell.y > room.position.y + room.size.y - 2:
+		return false
+	return int(grid[cell.y][cell.x]) == FLOOR_TILE
+
+
+func _clamp_cell_to_room(room: Rect2i, cell: Vector2i) -> Vector2i:
+	return Vector2i(
+		clampi(cell.x, room.position.x + 1, room.position.x + room.size.x - 2),
+		clampi(cell.y, room.position.y + 1, room.position.y + room.size.y - 2)
+	)
+
+
+func _get_room_anchor_cell(room: Rect2i, anchor: String) -> Vector2i:
+	match anchor:
+		"upper_left":
+			return Vector2i(room.position.x + 1, room.position.y + 1)
+		"upper_right":
+			return Vector2i(room.position.x + room.size.x - 2, room.position.y + 1)
+		"lower_left":
+			return Vector2i(room.position.x + 1, room.position.y + room.size.y - 2)
+		"lower_right":
+			return Vector2i(room.position.x + room.size.x - 2, room.position.y + room.size.y - 2)
+		_:
+			return _room_center(room)
+
+
+func _spawn_room_pickup(room: Rect2i, drop_data: Dictionary, anchor: String) -> void:
+	var loot: Node2D = DroppedLootScene.instantiate()
+	var cell: Vector2i = _get_room_spawn_cell(room, anchor)
+	loot.global_position = _cell_to_world(cell)
+	loot.set("pickup_id", "room_depth_%d_%s_%s" % [depth, _room_key(room), anchor])
+	loot.set("item_name", str(drop_data.get("name", "")))
+	loot.set("item_kind", str(drop_data.get("kind", "consumable")))
+	loot.set("item_count", int(drop_data.get("count", 1)))
+	loot.set("loot_visual", str(drop_data.get("visual", "bag")))
+	loot.set("speaker_name", str(drop_data.get("speaker", "Dungeon Cache")))
+	loot.set("available_message", str(drop_data.get("message", "Something glints in the dark.")))
+	gameplay_root.add_child(loot)
 
 
 func _roll_enemy_rarity() -> String:
@@ -1603,6 +2324,167 @@ func _spawn_mobile_controls() -> void:
 
 func _cell_to_world(cell: Vector2i) -> Vector2:
 	return Vector2(cell.x * TILE_SIZE + TILE_SIZE * 0.5, cell.y * TILE_SIZE + TILE_SIZE * 0.5)
+
+
+func _world_to_cell(world_position: Vector2) -> Vector2i:
+	return Vector2i(
+		clampi(int(floor(world_position.x / float(TILE_SIZE))), 0, GRID_WIDTH - 1),
+		clampi(int(floor(world_position.y / float(TILE_SIZE))), 0, GRID_HEIGHT - 1)
+	)
+
+
+func _restore_exploration_state() -> void:
+	visible_cells.clear()
+	last_player_map_cell = Vector2i(-9999, -9999)
+	if level_cache.has(depth):
+		explored_cells = _cell_array_to_set(level_cache[depth].get("explored_cells", []))
+	else:
+		explored_cells.clear()
+	_build_darkness_overlay()
+
+
+func _build_darkness_overlay() -> void:
+	if darkness_root == null:
+		return
+	for child in darkness_root.get_children():
+		child.queue_free()
+	exploration_mask_image = Image.create(GRID_WIDTH, GRID_HEIGHT, false, Image.FORMAT_RF)
+	exploration_mask_image.fill(Color(0.0, 0.0, 0.0, 1.0))
+	for y in range(GRID_HEIGHT):
+		for x in range(GRID_WIDTH):
+			exploration_mask_image.set_pixel(x, y, Color(1.0, 1.0, 1.0, 1.0) if explored_cells.has(_logical_key(Vector2i(x, y))) else Color(0.0, 0.0, 0.0, 1.0))
+	exploration_mask_texture = ImageTexture.create_from_image(exploration_mask_image)
+	darkness_material = ShaderMaterial.new()
+	darkness_material.shader = _build_darkness_shader()
+	darkness_sprite = Sprite2D.new()
+	darkness_sprite.centered = false
+	darkness_sprite.position = Vector2.ZERO
+	darkness_sprite.scale = Vector2(dungeon_size.x, dungeon_size.y)
+	darkness_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	darkness_sprite.texture = _create_white_texture()
+	darkness_sprite.material = darkness_material
+	darkness_sprite.z_index = 200
+	darkness_root.add_child(darkness_sprite)
+	_update_darkness_shader_uniforms()
+
+
+func _update_exploration_from_player(force: bool = false) -> void:
+	if player == null:
+		return
+	var player_cell: Vector2i = _world_to_cell(player.global_position)
+	if not force and player_cell == last_player_map_cell:
+		return
+	var previous_visible_cells: Dictionary = visible_cells.duplicate()
+	last_player_map_cell = player_cell
+	var next_visible_cells: Dictionary = {}
+	for offset_y in range(-MAP_REVEAL_RADIUS, MAP_REVEAL_RADIUS + 1):
+		for offset_x in range(-MAP_REVEAL_RADIUS, MAP_REVEAL_RADIUS + 1):
+			var candidate: Vector2i = player_cell + Vector2i(offset_x, offset_y)
+			if candidate.x < 0 or candidate.y < 0 or candidate.x >= GRID_WIDTH or candidate.y >= GRID_HEIGHT:
+				continue
+			if Vector2(float(offset_x), float(offset_y)).length() > float(MAP_REVEAL_RADIUS) + 0.4:
+				continue
+			if not _is_visible_dungeon_cell(candidate.x, candidate.y):
+				continue
+			next_visible_cells[_logical_key(candidate)] = true
+			explored_cells[_logical_key(candidate)] = true
+	visible_cells = next_visible_cells
+	_store_exploration_state()
+	_refresh_darkness_overlay(previous_visible_cells)
+	_update_dungeon_map_overlay()
+
+
+func _store_exploration_state() -> void:
+	if not level_cache.has(depth):
+		return
+	level_cache[depth]["explored_cells"] = _cell_set_to_array(explored_cells)
+
+
+func _refresh_darkness_overlay(previous_visible_cells: Dictionary = {}) -> void:
+	if exploration_mask_image == null or exploration_mask_texture == null:
+		return
+	var changed_cells: Dictionary = previous_visible_cells.duplicate()
+	for cell_key_variant in visible_cells.keys():
+		changed_cells[str(cell_key_variant)] = true
+	for cell_key in changed_cells.keys():
+		var cell: Vector2i = _cell_from_key(str(cell_key))
+		if cell.x < 0 or cell.y < 0 or cell.x >= GRID_WIDTH or cell.y >= GRID_HEIGHT:
+			continue
+		exploration_mask_image.set_pixel(
+			cell.x,
+			cell.y,
+			Color(1.0, 1.0, 1.0, 1.0) if explored_cells.has(_logical_key(cell)) else Color(0.0, 0.0, 0.0, 1.0)
+		)
+	exploration_mask_texture.update(exploration_mask_image)
+	_update_darkness_shader_uniforms()
+
+
+func _update_darkness_player_uniform() -> void:
+	if player == null or darkness_material == null:
+		return
+	_update_darkness_shader_uniforms()
+
+
+func _update_darkness_shader_uniforms() -> void:
+	if darkness_material == null:
+		return
+	var player_position_in_cells := player.global_position / float(TILE_SIZE) if player != null else Vector2.ZERO
+	darkness_material.set_shader_parameter("grid_size", Vector2(float(GRID_WIDTH), float(GRID_HEIGHT)))
+	darkness_material.set_shader_parameter("player_cell_position", player_position_in_cells)
+	darkness_material.set_shader_parameter("reveal_radius", float(MAP_REVEAL_RADIUS) + 0.85)
+	darkness_material.set_shader_parameter("exploration_mask", exploration_mask_texture)
+
+
+func _create_white_texture() -> Texture2D:
+	var image := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	image.fill(Color.WHITE)
+	return ImageTexture.create_from_image(image)
+
+
+func _build_darkness_shader() -> Shader:
+	var shader := Shader.new()
+	shader.code = """
+shader_type canvas_item;
+
+uniform sampler2D exploration_mask : filter_nearest, repeat_disable;
+uniform vec2 grid_size = vec2(1.0, 1.0);
+uniform vec2 player_cell_position = vec2(0.0, 0.0);
+uniform float reveal_radius = 6.85;
+
+void fragment() {
+	vec2 cell_position = UV * grid_size;
+	vec2 cell_index = floor(cell_position);
+	vec2 mask_uv = (cell_index + vec2(0.5)) / grid_size;
+	float explored = texture(exploration_mask, mask_uv).r;
+	float distance_from_player = distance(cell_position, player_cell_position);
+	float edge_blend = smoothstep(reveal_radius - 2.2, reveal_radius + 1.1, distance_from_player);
+	float inner_falloff = smoothstep(0.0, reveal_radius, distance_from_player);
+	float dark_alpha = 0.96;
+	float explored_alpha = 0.56;
+	float outer_alpha = mix(dark_alpha, explored_alpha, explored);
+	float visible_alpha = mix(0.02, 0.28, pow(inner_falloff, 1.6));
+	float alpha = mix(visible_alpha, outer_alpha, edge_blend);
+	COLOR = vec4(0.02, 0.024, 0.03, alpha);
+}
+"""
+	return shader
+
+
+func _update_dungeon_map_overlay() -> void:
+	var player_cell: Vector2i = _world_to_cell(player.global_position) if player != null else Vector2i(-1, -1)
+	var player_map_position: Vector2 = player.global_position / float(TILE_SIZE) if player != null else Vector2(-1.0, -1.0)
+	GameSession.set_overlay_dungeon_map_state({
+		"enabled": true,
+		"depth": depth,
+		"grid_size": Vector2i(GRID_WIDTH, GRID_HEIGHT),
+		"floor_cells": floor_cells,
+		"explored_cells": _cell_set_to_array(explored_cells, true),
+		"visible_cells": _cell_set_to_array(visible_cells, true),
+		"player_cell": player_cell,
+		"player_map_position": player_map_position,
+		"stairs_up_cell": gameplay_up_stairs_cell,
+		"stairs_down_cell": gameplay_down_stairs_cell
+	})
 
 
 func _get_player_spawn_cell(spawn_room: Rect2i, up_stairs_cell: Vector2i, down_stairs_cell: Vector2i) -> Vector2i:
@@ -1772,6 +2654,13 @@ func _on_player_interacted(target: Node) -> void:
 				InventoryStateScript.add_item(bag_slots, pickup_name, pickup_kind, pickup_count)
 				combat_message = "Picked up %s." % pickup_name
 			_update_overlay()
+			_refresh_player_interaction_state()
+
+
+func _refresh_player_interaction_state() -> void:
+	if player != null and player.has_method("refresh_nearby_interactable"):
+		player.call_deferred("refresh_nearby_interactable")
+	call_deferred("_update_overlay")
 
 
 func _on_enemy_defeated(enemy_id: String, enemy_name: String, xp_reward: int, _gold_reward: int, _loot_drop_name: String, _loot_drop_kind: String, _faction: String, _is_boss: bool) -> void:
@@ -1940,6 +2829,7 @@ func _update_overlay(next_message: String = "") -> void:
 		player_max_health
 	)
 	GameSession.set_overlay_quest_journal(_build_dungeon_journal(), tracked_quest_ids)
+	_update_dungeon_map_overlay()
 	_update_context_button()
 
 

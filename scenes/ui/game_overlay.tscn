@@ -1,8 +1,9 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/game_overlay.gd" id="1_y7c4u"]
 [ext_resource type="PackedScene" path="res://scenes/ui/player_view.tscn" id="2_player"]
 [ext_resource type="PackedScene" path="res://scenes/ui/inventory_page_view.tscn" id="3_inventory"]
+[ext_resource type="Script" path="res://scripts/ui/dungeon_map_widget.gd" id="4_map"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_health_under"]
 bg_color = Color(0.960784, 0.960784, 0.960784, 0.95)
@@ -61,7 +62,7 @@ shadow_color = Color(0, 0, 0, 0.22)
 shadow_size = 8
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_button"]
-bg_color = Color(0.141176, 0.176471, 0.12549, 0.94)
+bg_color = Color(0.141176, 0.176471, 0.12549, 0.5)
 corner_radius_top_left = 12
 corner_radius_top_right = 12
 corner_radius_bottom_right = 12
@@ -70,7 +71,7 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.956863, 0.952941, 0.839216, 0.2)
+border_color = Color(0.956863, 0.952941, 0.839216, 0.1)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_icon_button"]
 bg_color = Color(0.109804, 0.133333, 0.113725, 0.94)
@@ -206,8 +207,11 @@ offset_top = 10.0
 offset_right = 150.0
 offset_bottom = 36.0
 horizontal_alignment = 1
-theme_override_colors/font_color = Color(0.129412, 0.164706, 0.117647, 0.9)
+theme_override_colors/font_color = Color(0.964706, 0.933333, 0.654902, 0.96)
 theme_override_font_sizes/font_size = 20
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.45)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
 text = "Oakcross Village"
 
 [node name="InfoLabel" type="Label" parent="."]
@@ -232,25 +236,35 @@ offset_right = 956.0
 offset_bottom = 148.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_menu_button")
 
+[node name="DungeonMap" type="Control" parent="."]
+visible = false
+offset_left = 760.0
+offset_top = 164.0
+offset_right = 944.0
+offset_bottom = 372.0
+mouse_filter = 1
+script = ExtResource("4_map")
+
 [node name="MarginContainer" type="MarginContainer" parent="TrackedQuestPanel"]
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 8
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 6
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 6
 
 [node name="VBoxContainer" type="VBoxContainer" parent="TrackedQuestPanel/MarginContainer"]
-theme_override_constants/separation = 3
+theme_override_constants/separation = 2
 
 [node name="TrackedQuestTitle" type="Label" parent="TrackedQuestPanel/MarginContainer/VBoxContainer"]
 text = "Tracked Quest"
 theme_override_colors/font_color = Color(0.964706, 0.933333, 0.654902, 1)
-theme_override_font_sizes/font_size = 12
+theme_override_font_sizes/font_size = 11
 
 [node name="TrackedQuestBody" type="Label" parent="TrackedQuestPanel/MarginContainer/VBoxContainer"]
 autowrap_mode = 3
 text = "No quest tracked."
 theme_override_colors/font_color = Color(0.917647, 0.92549, 0.878431, 0.92)
-theme_override_font_sizes/font_size = 11
+theme_override_font_sizes/font_size = 10
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.12)
 
 [node name="TopMenuBar" type="HBoxContainer" parent="."]
 z_index = 3
@@ -269,7 +283,7 @@ theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_icon_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_icon_button")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_icon_button")
-text = "✦"
+text = "Quest"
 
 [node name="PlayerMenuButton" type="Button" parent="TopMenuBar"]
 custom_minimum_size = Vector2(42, 34)
@@ -278,7 +292,7 @@ theme_override_font_sizes/font_size = 16
 theme_override_styles/normal = SubResource("StyleBoxFlat_icon_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_icon_button")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_icon_button")
-text = "P"
+text = "Hero"
 
 [node name="InventoryMenuButton" type="Button" parent="TopMenuBar"]
 custom_minimum_size = Vector2(42, 34)
@@ -287,7 +301,7 @@ theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_icon_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_icon_button")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_icon_button")
-text = "▣"
+text = "Bag"
 
 [node name="SaveMenuButton" type="Button" parent="TopMenuBar"]
 custom_minimum_size = Vector2(42, 34)
@@ -296,7 +310,7 @@ theme_override_font_sizes/font_size = 18
 theme_override_styles/normal = SubResource("StyleBoxFlat_icon_button")
 theme_override_styles/hover = SubResource("StyleBoxFlat_icon_button")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_icon_button")
-text = "💾"
+text = "Save"
 
 [node name="MenuPanel" type="PanelContainer" parent="."]
 visible = false

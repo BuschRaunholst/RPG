@@ -1,61 +1,58 @@
-[gd_scene load_steps=8 format=3 uid="uid://dp3l5v4lgtubg"]
+[gd_scene load_steps=17 format=3 uid="uid://dp3l5v4lgtubg"]
 
 [ext_resource type="Script" path="res://scripts/ui/mobile_controls.gd" id="1_n4j2f"]
+[ext_resource type="Texture2D" path="res://assets/art/ui/icons/action_sword.svg" id="2_sword"]
+[ext_resource type="Texture2D" path="res://assets/art/ui/icons/action_hand.svg" id="3_hand"]
+[ext_resource type="Texture2D" path="res://assets/art/ui/icons/action_talk.svg" id="4_talk"]
+[ext_resource type="Script" path="res://scripts/ui/item_icon.gd" id="5_itemicon"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_pad"]
-bg_color = Color(0.0901961, 0.117647, 0.129412, 0.22)
-corner_radius_top_left = 36
-corner_radius_top_right = 36
-corner_radius_bottom_right = 36
-corner_radius_bottom_left = 36
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.937255, 0.960784, 0.882353, 0.16)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_joystick_base"]
-bg_color = Color(0.956863, 0.972549, 0.901961, 0.2)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_joystick_plate"]
+bg_color = Color(0.0509804, 0.0666667, 0.0745098, 0.025)
 corner_radius_top_left = 56
 corner_radius_top_right = 56
 corner_radius_bottom_right = 56
 corner_radius_bottom_left = 56
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.909804, 0.894118, 0.741176, 0.025)
+shadow_color = Color(0, 0, 0, 0.05)
+shadow_size = 2
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_joystick_outer"]
+bg_color = Color(0.917647, 0.952941, 0.905882, 0.045)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.956863, 0.972549, 0.901961, 0.18)
+border_color = Color(0.909804, 0.894118, 0.741176, 0.09)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_joystick_knob"]
-bg_color = Color(0.956863, 0.972549, 0.901961, 0.86)
-corner_radius_top_left = 24
-corner_radius_top_right = 24
-corner_radius_bottom_right = 24
-corner_radius_bottom_left = 24
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.388235, 0.552941, 0.301961, 0.45)
-shadow_color = Color(0, 0, 0, 0.16)
-shadow_size = 4
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_joystick_inner"]
+bg_color = Color(0.917647, 0.952941, 0.905882, 0.085)
+corner_radius_top_left = 54
+corner_radius_top_right = 54
+corner_radius_bottom_right = 54
+corner_radius_bottom_left = 54
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.04)
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_interact"]
-bg_color = Color(0.964706, 0.713726, 0.266667, 0.95)
-corner_radius_top_left = 32
-corner_radius_top_right = 32
-corner_radius_bottom_right = 32
-corner_radius_bottom_left = 32
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.494118, 0.321569, 0.0901961, 0.55)
-shadow_color = Color(0, 0, 0, 0.18)
-shadow_size = 5
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_knob_shadow"]
+bg_color = Color(0, 0, 0, 0.12)
+corner_radius_top_left = 28
+corner_radius_top_right = 28
+corner_radius_bottom_right = 28
+corner_radius_bottom_left = 28
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_attack"]
-bg_color = Color(0.905882, 0.447059, 0.278431, 0.95)
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_knob"]
+bg_color = Color(0.952941, 0.956863, 0.905882, 0.92)
 corner_radius_top_left = 28
 corner_radius_top_right = 28
 corner_radius_bottom_right = 28
@@ -64,23 +61,49 @@ border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.454902, 0.168627, 0.117647, 0.6)
-shadow_color = Color(0, 0, 0, 0.18)
+border_color = Color(0.862745, 0.827451, 0.576471, 0.22)
+shadow_color = Color(0, 0, 0, 0.1)
 shadow_size = 5
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_item"]
-bg_color = Color(0.411765, 0.639216, 0.317647, 0.95)
-corner_radius_top_left = 24
-corner_radius_top_right = 24
-corner_radius_bottom_right = 24
-corner_radius_bottom_left = 24
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_action_button"]
+bg_color = Color(0.0745098, 0.0901961, 0.101961, 0.86)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.862745, 0.827451, 0.576471, 0.18)
+shadow_color = Color(0, 0, 0, 0.2)
+shadow_size = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_skill_button"]
+bg_color = Color(0.101961, 0.129412, 0.145098, 0.3)
+corner_radius_top_left = 44
+corner_radius_top_right = 44
+corner_radius_bottom_right = 44
+corner_radius_bottom_left = 44
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.184314, 0.337255, 0.14902, 0.6)
-shadow_color = Color(0, 0, 0, 0.18)
-shadow_size = 5
+border_color = Color(0.909804, 0.894118, 0.741176, 0.08)
+shadow_color = Color(0, 0, 0, 0.1)
+shadow_size = 3
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_skill_disabled"]
+bg_color = Color(0.0862745, 0.105882, 0.117647, 0.18)
+corner_radius_top_left = 44
+corner_radius_top_right = 44
+corner_radius_bottom_right = 44
+corner_radius_bottom_left = 44
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.909804, 0.894118, 0.741176, 0.05)
 
 [node name="MobileControls" type="Control"]
 layout_mode = 3
@@ -92,84 +115,145 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("1_n4j2f")
 
-[node name="JoystickFrame" type="Panel" parent="."]
+[node name="JoystickPlate" type="Panel" parent="."]
 layout_mode = 0
-offset_left = 18.0
-offset_top = 338.0
-offset_right = 198.0
-offset_bottom = 518.0
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_pad")
+theme_override_styles/panel = SubResource("StyleBoxFlat_joystick_plate")
 
 [node name="JoystickArea" type="Control" parent="."]
 layout_mode = 0
-offset_left = 28.0
-offset_top = 348.0
-offset_right = 188.0
-offset_bottom = 508.0
 mouse_filter = 0
 
-[node name="Base" type="Panel" parent="JoystickArea"]
+[node name="OuterRing" type="Panel" parent="JoystickArea"]
 layout_mode = 0
-offset_left = 24.0
-offset_top = 24.0
-offset_right = 136.0
-offset_bottom = 136.0
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_joystick_base")
+theme_override_styles/panel = SubResource("StyleBoxFlat_joystick_outer")
+
+[node name="InnerRing" type="Panel" parent="JoystickArea"]
+layout_mode = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_joystick_inner")
+
+[node name="KnobShadow" type="Panel" parent="JoystickArea"]
+layout_mode = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_knob_shadow")
 
 [node name="Knob" type="Panel" parent="JoystickArea"]
 layout_mode = 0
-offset_left = 56.0
-offset_top = 56.0
-offset_right = 104.0
-offset_bottom = 104.0
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_joystick_knob")
-
-[node name="InteractRing" type="Panel" parent="."]
-layout_mode = 0
-offset_left = 796.0
-offset_top = 344.0
-offset_right = 948.0
-offset_bottom = 496.0
-mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_pad")
+theme_override_styles/panel = SubResource("StyleBoxFlat_knob")
 
 [node name="InteractButton" type="Button" parent="."]
 layout_mode = 0
-offset_left = 814.0
-offset_top = 362.0
-offset_right = 930.0
-offset_bottom = 478.0
 theme_override_font_sizes/font_size = 22
-theme_override_styles/normal = SubResource("StyleBoxFlat_interact")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_interact")
-theme_override_styles/hover = SubResource("StyleBoxFlat_interact")
-text = "Attack"
+theme_override_styles/normal = SubResource("StyleBoxFlat_action_button")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_action_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_action_button")
+text = ""
 
-[node name="AttackButton" type="Button" parent="."]
-visible = false
+[node name="ActionIcon" type="TextureRect" parent="InteractButton"]
 layout_mode = 0
-offset_left = 778.0
-offset_top = 296.0
-offset_right = 870.0
-offset_bottom = 388.0
-theme_override_font_sizes/font_size = 20
-theme_override_styles/normal = SubResource("StyleBoxFlat_attack")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_attack")
-theme_override_styles/hover = SubResource("StyleBoxFlat_attack")
-text = "Hit"
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -28.0
+offset_top = -28.0
+offset_right = 28.0
+offset_bottom = 28.0
+mouse_filter = 2
+texture = ExtResource("2_sword")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="QuickItemButton" type="Button" parent="."]
 layout_mode = 0
-offset_left = 706.0
-offset_top = 372.0
-offset_right = 796.0
-offset_bottom = 462.0
 disabled = true
 theme_override_font_sizes/font_size = 14
-theme_override_styles/normal = SubResource("StyleBoxFlat_item")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_item")
-theme_override_styles/hover = SubResource("StyleBoxFlat_item")
-text = "Item"
+theme_override_colors/font_color = Color(0.976471, 0.956863, 0.921569, 0.74)
+theme_override_colors/font_disabled_color = Color(0.976471, 0.956863, 0.921569, 0.38)
+theme_override_styles/normal = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_skill_disabled")
+text = "HP"
+
+[node name="ItemIcon" type="Control" parent="QuickItemButton"]
+visible = false
+layout_mode = 0
+offset_left = 8.0
+offset_top = 7.0
+offset_right = 46.0
+offset_bottom = 37.0
+mouse_filter = 2
+modulate = Color(1, 1, 1, 0.34)
+script = ExtResource("5_itemicon")
+
+[node name="ManaPotionButton" type="Button" parent="."]
+layout_mode = 0
+disabled = true
+theme_override_font_sizes/font_size = 14
+theme_override_colors/font_color = Color(0.976471, 0.956863, 0.921569, 0.74)
+theme_override_colors/font_disabled_color = Color(0.976471, 0.956863, 0.921569, 0.38)
+theme_override_styles/normal = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_skill_disabled")
+text = "MP"
+
+[node name="ItemIcon" type="Control" parent="ManaPotionButton"]
+visible = false
+layout_mode = 0
+offset_left = 8.0
+offset_top = 7.0
+offset_right = 46.0
+offset_bottom = 37.0
+mouse_filter = 2
+modulate = Color(1, 1, 1, 0.34)
+script = ExtResource("5_itemicon")
+
+[node name="SkillButton1" type="Button" parent="."]
+layout_mode = 0
+disabled = true
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_skill_disabled")
+theme_override_colors/font_color = Color(0.945098, 0.905882, 0.713726, 0.42)
+text = "✦"
+
+[node name="SkillButton2" type="Button" parent="."]
+layout_mode = 0
+disabled = true
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_skill_disabled")
+theme_override_colors/font_color = Color(0.945098, 0.905882, 0.713726, 0.42)
+text = "◆"
+
+[node name="SkillButton3" type="Button" parent="."]
+layout_mode = 0
+disabled = true
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_skill_disabled")
+theme_override_colors/font_color = Color(0.945098, 0.905882, 0.713726, 0.42)
+text = "✹"
+
+[node name="SkillButton4" type="Button" parent="."]
+layout_mode = 0
+disabled = true
+theme_override_font_sizes/font_size = 11
+theme_override_styles/normal = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/hover = SubResource("StyleBoxFlat_skill_button")
+theme_override_styles/disabled = SubResource("StyleBoxFlat_skill_disabled")
+theme_override_colors/font_color = Color(0.945098, 0.905882, 0.713726, 0.42)
+text = "✧"
