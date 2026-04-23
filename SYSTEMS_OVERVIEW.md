@@ -39,6 +39,7 @@ Current direction:
 - player weapon posing is authored around weapon grip points, with per-direction idle, windup, strike/release, and recover poses
 - weapon poses now include facing-aware layer and visibility defaults so `W/A/S/D` can hide or foreground arms, hands, shields, and weapons differently
 - weapon sprite facing is controlled by centralized per-style rotation profiles plus per-weapon rotation offsets, rather than scattered one-off pose angles
+- weapon visual offsets and projectile-origin points can now be defined in inventory weapon data, so new weapons can inherit class behavior without adding more player-script hardcoding
 
 ### Enemies
 

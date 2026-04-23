@@ -14,6 +14,7 @@ The major recent success is the move to a logical dungeon generator. That solved
 - modular player visuals exist
 - weapon profiles now support multiple melee styles plus basic ranged targeting
 - player weapon posing now has per-facing grip, arm visibility, and layer rules for cleaner front/side/back reads
+- weapon visual profiles now support data-driven offsets and projectile spawn points, reducing the need for item-name exceptions in the player script
 - room archetypes exist and are beginning to shape dungeon identity
 - mobile controls are supported
 - dungeon exploration now has a working minimap / navigator map pass

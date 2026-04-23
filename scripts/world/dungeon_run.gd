@@ -3,6 +3,7 @@ extends Node2D
 const InventoryStateScript = preload("res://scripts/world/inventory_state.gd")
 const ProgressionScript = preload("res://scripts/world/progression.gd")
 const LootTablesScript = preload("res://scripts/world/loot_tables.gd")
+const PlayerProjectileScript = preload("res://scripts/world/player_projectile.gd")
 const PlayerScene = preload("res://scenes/actors/player.tscn")
 const RatScene = preload("res://scenes/actors/rat.tscn")
 const ChestScene = preload("res://scenes/interactables/chest.tscn")
@@ -2609,7 +2610,9 @@ func _on_player_attack_requested(attack_data: Dictionary) -> void:
 		"melee_thrust":
 			hit_count = _resolve_player_thrust_attack(origin, direction, attack_range, float(attack_data.get("thickness", 18.0)), int(attack_data.get("max_targets", 1)), damage_value)
 		"projectile":
-			hit_count = _resolve_player_ranged_attack(origin, direction, attack_range, str(attack_data.get("targeting", "auto_target")), float(attack_data.get("arc_dot", -0.2)), int(attack_data.get("max_targets", 1)), damage_value)
+			_spawn_player_projectiles((attack_data.get("projectile_origin", origin) as Vector2), origin, direction, attack_range, str(attack_data.get("targeting", "auto_target")), float(attack_data.get("arc_dot", -0.2)), int(attack_data.get("max_targets", 1)), damage_value, weapon_name)
+			_update_overlay()
+			return
 		_:
 			hit_count = _resolve_player_arc_attack(origin, direction, attack_range, float(attack_data.get("arc_dot", 0.15)), int(attack_data.get("max_targets", 1)), damage_value)
 
@@ -2667,6 +2670,39 @@ func _resolve_player_ranged_attack(origin: Vector2, direction: Vector2, attack_d
 		enemy.call("take_damage", damage_value, origin, true)
 		hits += 1
 	return hits
+
+
+func _spawn_player_projectiles(spawn_origin: Vector2, origin: Vector2, direction: Vector2, attack_distance: float, targeting: String, arc_dot: float, max_targets: int, damage_value: int, weapon_name: String) -> void:
+	var selected_targets: Array[Node] = []
+	if targeting == "auto_target":
+		selected_targets = _get_attack_target_list(origin, direction, attack_distance, arc_dot, max_targets, true)
+
+	if selected_targets.is_empty():
+		_spawn_single_player_projectile(spawn_origin, direction, attack_distance, damage_value, weapon_name)
+		return
+
+	var spawn_count: int = 0
+	for enemy in selected_targets:
+		if spawn_count >= maxi(1, max_targets):
+			break
+		if enemy == null or not enemy is Node2D:
+			continue
+		var projectile_direction: Vector2 = ((enemy as Node2D).global_position - spawn_origin).normalized()
+		if projectile_direction == Vector2.ZERO:
+			projectile_direction = direction
+		_spawn_single_player_projectile(spawn_origin, projectile_direction, attack_distance, damage_value, weapon_name)
+		spawn_count += 1
+
+	if spawn_count == 0:
+		_spawn_single_player_projectile(spawn_origin, direction, attack_distance, damage_value, weapon_name)
+
+
+func _spawn_single_player_projectile(origin: Vector2, direction: Vector2, attack_distance: float, damage_value: int, weapon_name: String) -> void:
+	var projectile := PlayerProjectileScript.new()
+	projectile.setup(origin, direction, attack_distance, damage_value, weapon_name)
+	projectile.impacted.connect(_on_player_projectile_impacted)
+	projectile.expired.connect(_on_player_projectile_expired)
+	gameplay_root.add_child(projectile)
 
 
 func _get_attack_target_list(origin: Vector2, direction: Vector2, attack_distance: float, arc_dot: float, max_targets: int, allow_fallback: bool = false) -> Array[Node]:
@@ -2740,6 +2776,15 @@ func _build_player_miss_message(weapon_name: String, attack_kind: String) -> Str
 	if attack_kind == "melee_thrust":
 		return "%s thrusts into empty dark." % label
 	return "%s cuts the dark." % label
+
+
+func _on_player_projectile_impacted(_target: Node, weapon_name: String, damage_value: int) -> void:
+	combat_message = _build_player_hit_message(weapon_name, "projectile", damage_value, 1)
+	_update_overlay()
+
+
+func _on_player_projectile_expired(_weapon_name: String) -> void:
+	pass
 
 
 func _on_player_interacted(target: Node) -> void:

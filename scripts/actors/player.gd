@@ -207,6 +207,7 @@ func try_attack() -> bool:
 
 	attack_requested.emit({
 		"origin": global_position,
+		"projectile_origin": _get_projectile_spawn_global(),
 		"direction": aim_direction,
 		"weapon_name": equipped_weapon_name,
 		"attack_kind": str(attack_profile.get("attack_kind", "melee_arc")),
@@ -219,6 +220,25 @@ func try_attack() -> bool:
 		"ranged": bool(attack_profile.get("ranged", false))
 	})
 	return true
+
+
+func _get_projectile_spawn_global() -> Vector2:
+	if weapon_rig == null or weapon_rig_sprite == null or not weapon_rig.visible:
+		return global_position + facing_direction.normalized() * 12.0
+
+	var weapon_profile: Dictionary = _get_weapon_visual_profile(equipped_weapon_name)
+	var local_spawn_variant: Variant = weapon_profile.get("projectile_spawn_local", null)
+	if not local_spawn_variant is Vector2:
+		return global_position + facing_direction.normalized() * 12.0
+	var local_spawn_point: Vector2 = local_spawn_variant as Vector2
+
+	var player_local: Vector2 = _weapon_local_to_player(
+		weapon_rig.position,
+		rad_to_deg(weapon_rig.rotation),
+		local_spawn_point,
+		weapon_rig_sprite.offset
+	)
+	return to_global(player_local)
 
 
 func show_hurt_feedback() -> void:
@@ -359,7 +379,8 @@ func _update_weapon_pose(attack_t: float, attack_offset: Vector2) -> void:
 	var weapon_profile: Dictionary = _get_weapon_visual_profile(equipped_weapon_name)
 	var style: String = str(weapon_profile.get("hold_style", "one_hand"))
 	var has_weapon: bool = weapon_textures.has(equipped_weapon_name)
-	var can_show_shield: bool = shield_textures.has(equipped_offhand_name) and not bool(weapon_profile.get("two_handed", false))
+	var blocks_offhand: bool = bool(weapon_profile.get("two_handed", false)) or style == "staff"
+	var can_show_shield: bool = shield_textures.has(equipped_offhand_name) and not blocks_offhand
 	var direction_rig: Dictionary = _get_direction_rig(direction_name)
 	var pose: Dictionary = _sample_pose(style, direction_name, attack_t)
 	pose = _apply_pose_layer_defaults(pose, style, direction_name)
@@ -367,6 +388,8 @@ func _update_weapon_pose(attack_t: float, attack_offset: Vector2) -> void:
 
 	var left_shoulder: Vector2 = (direction_rig.get("left_shoulder", Vector2.ZERO) as Vector2) + attack_offset
 	var right_shoulder: Vector2 = (direction_rig.get("right_shoulder", Vector2.ZERO) as Vector2) + attack_offset
+	left_shoulder += pose.get("left_shoulder_offset", Vector2.ZERO) as Vector2
+	right_shoulder += pose.get("right_shoulder_offset", Vector2.ZERO) as Vector2
 	var weapon_position: Vector2 = (pose.get("weapon_position", Vector2.ZERO) as Vector2) + attack_offset
 	var weapon_rotation_degrees: float = float(pose.get("weapon_rotation", 0.0))
 
@@ -387,15 +410,25 @@ func _update_weapon_pose(attack_t: float, attack_offset: Vector2) -> void:
 	var uses_relaxed_offhand: bool = _uses_one_hand_shield_stance(style) and not left_target_variant is Vector2
 	var uses_relaxed_shield: bool = can_show_shield and uses_relaxed_offhand
 	if uses_relaxed_offhand:
-		left_target = _relaxed_offhand_target(direction_name) + attack_offset
-		pose["show_left_arm"] = direction_name != "right"
-		if direction_name == "up":
-			pose["show_right_arm"] = true
+		if style == "staff":
+			left_target = _staff_rest_offhand_target(direction_name) + attack_offset
+			pose["show_left_arm"] = direction_name != "right"
+			if direction_name == "up":
+				pose["show_right_arm"] = true
+		else:
+			left_target = _relaxed_offhand_target(direction_name) + attack_offset
+			pose["show_left_arm"] = direction_name != "right"
+			if direction_name == "up":
+				pose["show_right_arm"] = true
 
 	var show_left_arm: bool = bool(pose.get("show_left_arm", true))
 	var show_right_arm: bool = bool(pose.get("show_right_arm", true))
 	_apply_arm_pose(left_arm_pivot, left_arm_sprite, left_shoulder, left_target, show_left_arm, int(pose.get("left_arm_z", direction_rig.get("left_arm_z", 4))))
 	_apply_arm_pose(right_arm_pivot, right_arm_sprite, right_shoulder, right_target, show_right_arm, int(pose.get("right_arm_z", direction_rig.get("right_arm_z", 5))))
+	if show_left_arm and pose.has("left_arm_scale_y"):
+		left_arm_sprite.scale.y = float(pose.get("left_arm_scale_y", left_arm_sprite.scale.y))
+	if show_right_arm and pose.has("right_arm_scale_y"):
+		right_arm_sprite.scale.y = float(pose.get("right_arm_scale_y", right_arm_sprite.scale.y))
 
 	shield_socket.position = _get_shield_socket_position(direction_rig, direction_name, uses_relaxed_shield)
 	shield_pivot.rotation = deg_to_rad(_get_shield_rotation(direction_rig, direction_name, uses_relaxed_shield))
@@ -496,10 +529,11 @@ func _staff_vertical_rotation_profile() -> Dictionary:
 
 func _bow_rotation_profile(direction_name: String) -> Dictionary:
 	match direction_name:
-		"up", "down":
-			return {"idle": 90.0, "windup": 90.0, "strike": 90.0, "recover": 90.0}
-		_:
-			return {"idle": 0.0, "windup": 0.0, "strike": 0.0, "recover": 0.0}
+		"up", "left":
+			return {"idle": -28.0, "windup": -28.0, "strike": -28.0, "recover": -28.0}
+		"down", "right":
+			return {"idle": 20.0, "windup": 20.0, "strike": 20.0, "recover": 20.0}
+	return {"idle": 0.0, "windup": 0.0, "strike": 0.0, "recover": 0.0}
 
 
 func _point_out_degrees(direction_name: String) -> float:
@@ -559,7 +593,7 @@ func _get_direction_rig(direction_name: String) -> Dictionary:
 		"right":
 			return {
 				"left_shoulder": Vector2(2.0, -18.0),
-				"right_shoulder": Vector2(3.0, -18.0),
+				"right_shoulder": Vector2(1.0, -18.0),
 				"left_arm_z": 4,
 				"right_arm_z": 5,
 				"shield_socket": Vector2(0.0, 13.0),
@@ -689,31 +723,31 @@ func _get_bow_pose_set(direction_name: String) -> Dictionary:
 	match direction_name:
 		"left":
 			return {
-				"idle": _pose(Vector2(1.0, -8.0), 180.0, Vector2(8.0, 14.0), Vector2(8.0, 24.0)),
-				"windup": _pose(Vector2(0.0, -8.0), 180.0, Vector2(2.0, 14.0), Vector2(8.0, 24.0)),
-				"strike": _pose(Vector2(0.0, -8.0), 180.0, Vector2(0.0, 14.0), Vector2(8.0, 24.0)),
-				"recover": _pose(Vector2(1.0, -8.0), 180.0, Vector2(4.0, 14.0), Vector2(8.0, 24.0))
+				"idle": _pose(Vector2(-16.0, -17.0), -6.0, Vector2(13.0, 17.0), Vector2(6.0, 17.0), {"weapon_z": 1, "left_arm_z": 6, "right_arm_z": 1}),
+				"windup": _pose(Vector2(-17.0, -17.0), -10.0, Vector2(15.0, 17.0), Vector2(6.0, 17.0), {"weapon_z": 1, "left_arm_z": 6, "right_arm_z": 1}),
+				"strike": _pose(Vector2(-16.0, -17.0), -2.0, Vector2(11.0, 17.0), Vector2(6.0, 17.0), {"weapon_z": 1, "left_arm_z": 6, "right_arm_z": 1}),
+				"recover": _pose(Vector2(-16.0, -17.0), -4.0, Vector2(12.0, 17.0), Vector2(6.0, 17.0), {"weapon_z": 1, "left_arm_z": 6, "right_arm_z": 1})
 			}
 		"right":
 			return {
-				"idle": _pose(Vector2(-1.0, -8.0), 0.0, Vector2(8.0, 14.0), Vector2(8.0, 24.0)),
-				"windup": _pose(Vector2(0.0, -8.0), 0.0, Vector2(14.0, 14.0), Vector2(8.0, 24.0)),
-				"strike": _pose(Vector2(0.0, -8.0), 0.0, Vector2(16.0, 14.0), Vector2(8.0, 24.0)),
-				"recover": _pose(Vector2(-1.0, -8.0), 0.0, Vector2(12.0, 14.0), Vector2(8.0, 24.0))
+				"idle": _pose(Vector2(14.0, -17.0), 6.0, Vector2(4.0, 17.0), Vector2(11.0, 17.0), {"weapon_z": 6, "weapon_flip_h": true, "left_arm_z": 6, "right_arm_z": 5}),
+				"windup": _pose(Vector2(15.0, -17.0), 10.0, Vector2(2.0, 17.0), Vector2(11.0, 17.0), {"weapon_z": 6, "weapon_flip_h": true, "left_arm_z": 6, "right_arm_z": 5}),
+				"strike": _pose(Vector2(14.0, -17.0), 2.0, Vector2(6.0, 17.0), Vector2(11.0, 17.0), {"weapon_z": 6, "weapon_flip_h": true, "left_arm_z": 6, "right_arm_z": 5}),
+				"recover": _pose(Vector2(14.0, -17.0), 4.0, Vector2(5.0, 17.0), Vector2(11.0, 17.0), {"weapon_z": 6, "weapon_flip_h": true, "left_arm_z": 6, "right_arm_z": 5})
 			}
 		"up":
 			return {
-				"idle": _pose(Vector2(0.0, -10.0), -90.0, Vector2(8.0, 12.0), Vector2(8.0, 22.0)),
-				"windup": _pose(Vector2(0.0, -10.0), -90.0, Vector2(2.0, 12.0), Vector2(8.0, 22.0)),
-				"strike": _pose(Vector2(0.0, -10.0), -90.0, Vector2(0.0, 12.0), Vector2(8.0, 22.0)),
-				"recover": _pose(Vector2(0.0, -10.0), -90.0, Vector2(4.0, 12.0), Vector2(8.0, 22.0))
+				"idle": _pose(Vector2(-8.0, -17.0), -28.0, Vector2(10.0, 17.0), Vector2(5.0, 15.0), {"weapon_z": 0, "left_arm_z": 1, "right_arm_z": 1, "left_arm_scale_y": 0.4}),
+				"windup": _pose(Vector2(-7.0, -17.0), -28.0, Vector2(12.0, 17.0), Vector2(5.0, 15.0), {"weapon_z": 0, "left_arm_z": 1, "right_arm_z": 1, "left_arm_scale_y": 0.4}),
+				"strike": _pose(Vector2(-8.0, -17.0), -28.0, Vector2(8.0, 17.0), Vector2(5.0, 15.0), {"weapon_z": 0, "left_arm_z": 1, "right_arm_z": 1, "left_arm_scale_y": 0.4}),
+				"recover": _pose(Vector2(-8.0, -17.0), -28.0, Vector2(9.0, 17.0), Vector2(5.0, 15.0), {"weapon_z": 0, "left_arm_z": 1, "right_arm_z": 1, "left_arm_scale_y": 0.4})
 			}
 		_:
 			return {
-				"idle": _pose(Vector2(0.0, -5.0), 8.0, Vector2(8.0, 12.0), Vector2(8.0, 22.0)),
-				"windup": _pose(Vector2(0.0, -5.0), 74.0, Vector2(14.0, 12.0), Vector2(8.0, 22.0)),
-				"strike": _pose(Vector2(0.0, -5.0), 88.0, Vector2(16.0, 12.0), Vector2(8.0, 22.0)),
-				"recover": _pose(Vector2(0.0, -5.0), 28.0, Vector2(12.0, 12.0), Vector2(8.0, 22.0))
+				"idle": _pose(Vector2(4.0, -15.0), 0.0, Vector2(4.0, 17.0), Vector2(11.0, 17.0), {"weapon_z": 6, "weapon_flip_h": true, "left_arm_z": 6, "right_arm_z": 5}),
+				"windup": _pose(Vector2(3.0, -15.0), 0.0, Vector2(2.0, 17.0), Vector2(11.0, 17.0), {"weapon_z": 6, "weapon_flip_h": true, "left_arm_z": 6, "right_arm_z": 5}),
+				"strike": _pose(Vector2(4.0, -15.0), 0.0, Vector2(7.0, 17.0), Vector2(11.0, 17.0), {"weapon_z": 6, "weapon_flip_h": true, "left_arm_z": 6, "right_arm_z": 5}),
+				"recover": _pose(Vector2(4.0, -15.0), 0.0, Vector2(6.0, 17.0), Vector2(11.0, 17.0), {"weapon_z": 6, "weapon_flip_h": true, "left_arm_z": 6, "right_arm_z": 5})
 			}
 
 
@@ -721,31 +755,31 @@ func _get_staff_pose_set(direction_name: String) -> Dictionary:
 	match direction_name:
 		"left":
 			return {
-				"idle": _pose(Vector2(-13.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"windup": _pose(Vector2(-15.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"strike": _pose(Vector2(-18.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"recover": _pose(Vector2(-13.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6})
+				"idle": _pose(Vector2(-14.0, -16.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 1, "left_arm_z": 5, "right_arm_z": 1, "left_shoulder_offset": Vector2(2.0, 0.0)}),
+				"windup": _pose(Vector2(-16.0, -16.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 1, "left_arm_z": 5, "right_arm_z": 1, "left_shoulder_offset": Vector2(2.0, 0.0)}),
+				"strike": _pose(Vector2(-19.0, -16.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 1, "left_arm_z": 5, "right_arm_z": 1, "left_shoulder_offset": Vector2(2.0, 0.0)}),
+				"recover": _pose(Vector2(-14.0, -16.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 1, "left_arm_z": 5, "right_arm_z": 1, "left_shoulder_offset": Vector2(2.0, 0.0)})
 			}
 		"right":
 			return {
-				"idle": _pose(Vector2(18.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"windup": _pose(Vector2(20.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"strike": _pose(Vector2(23.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"recover": _pose(Vector2(18.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6})
+				"idle": _pose(Vector2(18.0, -15.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"windup": _pose(Vector2(20.0, -15.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"strike": _pose(Vector2(23.0, -15.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"recover": _pose(Vector2(18.0, -15.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 6, "right_arm_z": 6})
 			}
 		"up":
 			return {
-				"idle": _pose(Vector2(22.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 1, "right_arm_z": 1, "show_right_arm": true}),
-				"windup": _pose(Vector2(24.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 1, "right_arm_z": 1, "show_right_arm": true}),
-				"strike": _pose(Vector2(27.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 1, "right_arm_z": 1, "show_right_arm": true}),
-				"recover": _pose(Vector2(22.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 1, "right_arm_z": 1, "show_right_arm": true})
+				"idle": _pose(Vector2(20.0, -17.0), 90.0, Vector2(6.0, 20.0), null, {"weapon_z": 0, "right_arm_z": 1, "show_right_arm": true}),
+				"windup": _pose(Vector2(22.0, -17.0), 90.0, Vector2(6.0, 20.0), null, {"weapon_z": 0, "right_arm_z": 1, "show_right_arm": true}),
+				"strike": _pose(Vector2(25.0, -17.0), 90.0, Vector2(6.0, 20.0), null, {"weapon_z": 0, "right_arm_z": 1, "show_right_arm": true}),
+				"recover": _pose(Vector2(20.0, -17.0), 90.0, Vector2(6.0, 20.0), null, {"weapon_z": 0, "right_arm_z": 1, "show_right_arm": true})
 			}
 		_:
 			return {
-				"idle": _pose(Vector2(-24.0, -19.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"windup": _pose(Vector2(-26.0, -19.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"strike": _pose(Vector2(-29.0, -19.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"recover": _pose(Vector2(-24.0, -19.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6})
+				"idle": _pose(Vector2(-22.0, -13.0), 90.0, Vector2(6.0, 20.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"windup": _pose(Vector2(-24.0, -13.0), 90.0, Vector2(6.0, 20.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"strike": _pose(Vector2(-27.0, -13.0), 90.0, Vector2(6.0, 20.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"recover": _pose(Vector2(-22.0, -13.0), 90.0, Vector2(6.0, 20.0), null, {"weapon_z": 6, "right_arm_z": 6})
 			}
 
 
@@ -803,6 +837,18 @@ func _relaxed_offhand_target(direction_name: String) -> Vector2:
 			return Vector2(-8.0, -6.0)
 		_:
 			return Vector2(10.0, -2.0)
+
+
+func _staff_rest_offhand_target(direction_name: String) -> Vector2:
+	match direction_name:
+		"left":
+			return Vector2(-3.0, -1.0)
+		"right":
+			return Vector2(2.0, -2.0)
+		"up":
+			return Vector2(-8.0, -6.0)
+		_:
+			return Vector2(10.0, -1.0)
 
 
 func _uses_one_hand_shield_stance(style: String) -> bool:
@@ -928,26 +974,43 @@ func _get_current_attack_profile() -> Dictionary:
 
 func _get_weapon_visual_profile(weapon_name: String) -> Dictionary:
 	var profile: Dictionary = InventoryStateScript.get_weapon_data(weapon_name)
+	var visual_profile: Dictionary = {}
+	var raw_visual_profile: Variant = profile.get("visual_profile", {})
+	if raw_visual_profile is Dictionary:
+		visual_profile = (raw_visual_profile as Dictionary).duplicate(true)
+	for key in visual_profile.keys():
+		profile[key] = visual_profile[key]
+	if not profile.has("offset"):
+		profile["offset"] = _get_legacy_weapon_offset(weapon_name)
+	if not profile.has("rotation_offsets"):
+		profile["rotation_offsets"] = {"default": 0.0}
+	if not profile.has("projectile_spawn_local"):
+		var legacy_spawn: Variant = _get_legacy_projectile_spawn_local(weapon_name)
+		if legacy_spawn is Vector2:
+			profile["projectile_spawn_local"] = legacy_spawn
+	return profile
+
+
+func _get_legacy_weapon_offset(weapon_name: String) -> Vector2:
+	match weapon_name:
+		"Hunter Bow", "Iron Greatsword":
+			return Vector2(-6.0, -17.0)
+		"Ash Staff":
+			return Vector2(-6.0, -19.0)
+		_:
+			return Vector2(-3.0, -7.0)
+
+
+func _get_legacy_projectile_spawn_local(weapon_name: String) -> Variant:
 	match weapon_name:
 		"Hunter Bow":
-			profile["offset"] = Vector2(-6.0, -17.0)
-			profile["rotation_offsets"] = {"default": 0.0}
+			return Vector2(9.0, 17.0)
 		"Ash Staff":
-			profile["offset"] = Vector2(-6.0, -42.0)
-			profile["rotation_offsets"] = {"default": 0.0}
+			return Vector2(6.0, 2.0)
 		"Willow Wand":
-			profile["offset"] = Vector2(-3.0, -7.0)
-			profile["rotation_offsets"] = {"default": 0.0}
-		"Iron Greatsword":
-			profile["offset"] = Vector2(-6.0, -17.0)
-			profile["rotation_offsets"] = {"default": 0.0}
-		"Woodsman Axe":
-			profile["offset"] = Vector2(-3.0, -7.0)
-			profile["rotation_offsets"] = {"default": 0.0}
+			return Vector2(17.0, 5.0)
 		_:
-			profile["offset"] = Vector2(-3.0, -7.0)
-			profile["rotation_offsets"] = {"default": 0.0}
-	return profile
+			return null
 
 
 func _update_attack_arm_texture() -> void:
@@ -979,19 +1042,72 @@ func _create_knife_texture() -> Texture2D:
 
 
 func _create_bow_texture() -> Texture2D:
-	var image: Image = Image.create(16, 30, false, Image.FORMAT_RGBA8)
+	var image: Image = Image.create(18, 34, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.0, 0.0, 0.0, 0.0))
 	var outline: Color = Color(0.04, 0.03, 0.025, 1.0)
-	var wood: Color = Color(0.44, 0.25, 0.12, 1.0)
-	var string_color: Color = Color(0.82, 0.78, 0.68, 1.0)
-	image.fill_rect(Rect2i(4, 2, 2, 26), outline)
-	image.fill_rect(Rect2i(10, 2, 2, 26), outline)
-	image.fill_rect(Rect2i(5, 3, 1, 24), wood)
-	image.fill_rect(Rect2i(10, 3, 1, 24), wood)
-	image.fill_rect(Rect2i(6, 2, 5, 1), outline)
-	image.fill_rect(Rect2i(6, 27, 5, 1), outline)
-	for y in range(4, 26):
-		image.set_pixel(8, y, string_color)
+	var bow_dark: Color = Color(0.42, 0.10, 0.18, 1.0)
+	var bow_mid: Color = Color(0.63, 0.17, 0.28, 1.0)
+	var bow_light: Color = Color(0.78, 0.30, 0.38, 1.0)
+	var wrap: Color = Color(0.86, 0.67, 0.24, 1.0)
+	var string_color: Color = Color(0.84, 0.78, 0.63, 1.0)
+	var bow_rows := {
+		2: Vector2i(11, 13),
+		3: Vector2i(9, 14),
+		4: Vector2i(8, 14),
+		5: Vector2i(7, 13),
+		6: Vector2i(6, 12),
+		7: Vector2i(5, 11),
+		8: Vector2i(4, 10),
+		9: Vector2i(4, 9),
+		10: Vector2i(3, 8),
+		11: Vector2i(3, 7),
+		12: Vector2i(2, 6),
+		13: Vector2i(2, 5),
+		14: Vector2i(2, 5),
+		15: Vector2i(2, 5),
+		16: Vector2i(2, 5),
+		17: Vector2i(2, 5),
+		18: Vector2i(2, 5),
+		19: Vector2i(2, 5),
+		20: Vector2i(2, 5),
+		21: Vector2i(2, 5),
+		22: Vector2i(2, 6),
+		23: Vector2i(2, 6),
+		24: Vector2i(2, 6),
+		25: Vector2i(2, 6),
+		26: Vector2i(3, 6),
+		27: Vector2i(3, 7),
+		28: Vector2i(4, 8),
+		29: Vector2i(5, 8),
+		30: Vector2i(5, 7),
+		31: Vector2i(5, 7),
+		32: Vector2i(5, 6)
+	}
+	for y in bow_rows.keys():
+		var row: Vector2i = bow_rows[y]
+		for x in range(row.x, row.y + 1):
+			var color: Color = bow_mid
+			if y >= 22:
+				color = bow_dark
+			if x >= row.y - 1:
+				color = bow_light if y < 22 else bow_mid
+			if x == row.x or x == row.y:
+				color = outline
+			image.set_pixel(x, y, color)
+	image.fill_rect(Rect2i(12, 2, 2, 3), wrap)
+	image.fill_rect(Rect2i(5, 30, 2, 3), wrap)
+	image.fill_rect(Rect2i(5, 12, 2, 8), outline)
+	image.fill_rect(Rect2i(6, 13, 1, 6), bow_dark)
+	for point in [Vector2i(10, 3), Vector2i(9, 4), Vector2i(8, 6), Vector2i(7, 8), Vector2i(4, 24), Vector2i(5, 27), Vector2i(6, 29)]:
+		image.set_pixelv(point, bow_light)
+	var string_points := [
+		Vector2i(13, 3), Vector2i(13, 5), Vector2i(12, 7), Vector2i(12, 9),
+		Vector2i(11, 11), Vector2i(11, 13), Vector2i(10, 15), Vector2i(10, 17),
+		Vector2i(9, 19), Vector2i(9, 21), Vector2i(8, 23), Vector2i(8, 25),
+		Vector2i(7, 27), Vector2i(7, 29), Vector2i(6, 31)
+	]
+	for point in string_points:
+		image.set_pixelv(point, string_color)
 	return ImageTexture.create_from_image(image)
 
 

@@ -15,7 +15,13 @@ const DEFAULT_WEAPON_DATA := {
 	"max_targets": 1,
 	"damage_scale": 1.0,
 	"two_handed": false,
-	"ranged": false
+	"ranged": false,
+	"visual_profile": {
+		"offset": Vector2(-3.0, -7.0),
+		"rotation_offsets": {
+			"default": 0.0
+		}
+	}
 }
 const ITEM_DATA := {
 	"Traveler Knife": {
@@ -37,7 +43,13 @@ const ITEM_DATA := {
 			"max_targets": 1,
 			"damage_scale": 1.0,
 			"two_handed": false,
-			"ranged": false
+			"ranged": false,
+			"visual_profile": {
+				"offset": Vector2(-3.0, -7.0),
+				"rotation_offsets": {
+					"default": 0.0
+				}
+			}
 		}
 	},
 	"Hunter Bow": {
@@ -59,7 +71,14 @@ const ITEM_DATA := {
 			"max_targets": 1,
 			"damage_scale": 0.95,
 			"two_handed": true,
-			"ranged": true
+			"ranged": true,
+			"visual_profile": {
+				"offset": Vector2(-6.0, -17.0),
+				"rotation_offsets": {
+					"default": 0.0
+				},
+				"projectile_spawn_local": Vector2(9.0, 17.0)
+			}
 		}
 	},
 	"Ash Staff": {
@@ -81,7 +100,14 @@ const ITEM_DATA := {
 			"max_targets": 2,
 			"damage_scale": 1.05,
 			"two_handed": false,
-			"ranged": true
+			"ranged": true,
+			"visual_profile": {
+				"offset": Vector2(-6.0, -19.0),
+				"rotation_offsets": {
+					"default": 0.0
+				},
+				"projectile_spawn_local": Vector2(6.0, 2.0)
+			}
 		}
 	},
 	"Willow Wand": {
@@ -103,7 +129,14 @@ const ITEM_DATA := {
 			"max_targets": 1,
 			"damage_scale": 0.9,
 			"two_handed": false,
-			"ranged": true
+			"ranged": true,
+			"visual_profile": {
+				"offset": Vector2(-3.0, -7.0),
+				"rotation_offsets": {
+					"default": 0.0
+				},
+				"projectile_spawn_local": Vector2(17.0, 5.0)
+			}
 		}
 	},
 	"Iron Greatsword": {
@@ -125,7 +158,13 @@ const ITEM_DATA := {
 			"max_targets": 3,
 			"damage_scale": 1.2,
 			"two_handed": true,
-			"ranged": false
+			"ranged": false,
+			"visual_profile": {
+				"offset": Vector2(-6.0, -17.0),
+				"rotation_offsets": {
+					"default": 0.0
+				}
+			}
 		}
 	},
 	"Woodsman Axe": {
@@ -147,7 +186,13 @@ const ITEM_DATA := {
 			"max_targets": 2,
 			"damage_scale": 1.1,
 			"two_handed": false,
-			"ranged": false
+			"ranged": false,
+			"visual_profile": {
+				"offset": Vector2(-3.0, -7.0),
+				"rotation_offsets": {
+					"default": 0.0
+				}
+			}
 		}
 	},
 	"Village Tunic": {
@@ -470,7 +515,13 @@ static func get_weapon_data(item_name: String) -> Dictionary:
 
 	var weapon_data: Dictionary = DEFAULT_WEAPON_DATA.duplicate(true)
 	for key in (raw_weapon as Dictionary).keys():
-		weapon_data[key] = raw_weapon[key]
+		if key == "visual_profile" and raw_weapon[key] is Dictionary:
+			var visual_profile: Dictionary = weapon_data.get("visual_profile", {}).duplicate(true)
+			for visual_key in (raw_weapon[key] as Dictionary).keys():
+				visual_profile[visual_key] = (raw_weapon[key] as Dictionary)[visual_key]
+			weapon_data[key] = visual_profile
+		else:
+			weapon_data[key] = raw_weapon[key]
 	return weapon_data
 
 
@@ -498,6 +549,12 @@ static func is_two_handed_item(item_name: String) -> bool:
 	return bool(weapon_data.get("two_handed", false))
 
 
+static func blocks_offhand_item(item_name: String) -> bool:
+	var weapon_data: Dictionary = get_weapon_data(item_name)
+	var hold_style: String = str(weapon_data.get("hold_style", ""))
+	return bool(weapon_data.get("two_handed", false)) or hold_style == "staff"
+
+
 static func can_equip_item_to_slot(item_data: Dictionary, target_slot: String, raw_equipment_slots: Variant) -> bool:
 	var normalized_item: Dictionary = normalize_item(item_data)
 	if normalized_item.is_empty():
@@ -508,14 +565,14 @@ static func can_equip_item_to_slot(item_data: Dictionary, target_slot: String, r
 		return false
 
 	var equipment_slots: Dictionary = normalize_equipment(raw_equipment_slots)
-	if target_slot == "weapon" and is_two_handed_item(str(normalized_item.get("name", ""))):
+	if target_slot == "weapon" and blocks_offhand_item(str(normalized_item.get("name", ""))):
 		return normalize_item(equipment_slots.get("offhand", {})).is_empty()
 
 	if target_slot == "offhand":
 		var equipped_weapon: Dictionary = normalize_item(equipment_slots.get("weapon", {}))
 		if equipped_weapon.is_empty():
 			return true
-		return not is_two_handed_item(str(equipped_weapon.get("name", "")))
+		return not blocks_offhand_item(str(equipped_weapon.get("name", "")))
 
 	return true
 
