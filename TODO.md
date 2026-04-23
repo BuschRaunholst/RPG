@@ -25,12 +25,13 @@
   - humanoids
   - bosses
 - Expand enemy behavior and attack readability.
+- Tune weapon-specific motion, ranged feel, and target selection as more gear is added.
 - Improve loot/drop identity by enemy and room type.
 
 ## Character / visuals
 
 - Continue modular visual equipment support.
-- Improve readability of weapon/shield positioning where needed.
+- Continue tuning authored weapon/shield poses now that grip points, facing-aware layering, and centralized weapon-facing rotations are in place.
 - Expand equipment visuals as more item types are added.
 
 ## Workflow

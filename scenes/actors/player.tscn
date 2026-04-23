@@ -43,6 +43,16 @@ offset = Vector2(-3, 0)
 [node name="ShieldSocket" type="Node2D" parent="LeftArmPivot"]
 position = Vector2(0, 16)
 
+[node name="LeftWeaponSocket" type="Node2D" parent="LeftArmPivot"]
+position = Vector2(0, 17)
+
+[node name="LeftWeaponPivot" type="Node2D" parent="LeftArmPivot/LeftWeaponSocket"]
+
+[node name="LeftWeaponSprite" type="Sprite2D" parent="LeftArmPivot/LeftWeaponSocket/LeftWeaponPivot"]
+z_index = 1
+centered = false
+offset = Vector2(-3, -7)
+
 [node name="ShieldPivot" type="Node2D" parent="LeftArmPivot/ShieldSocket"]
 
 [node name="ShieldSprite" type="Sprite2D" parent="LeftArmPivot/ShieldSocket/ShieldPivot"]
@@ -73,6 +83,13 @@ position = Vector2(0, 17)
 
 [node name="WeaponSprite" type="Sprite2D" parent="RightArmPivot/WeaponSocket/WeaponPivot"]
 z_index = 1
+centered = false
+offset = Vector2(-3, -7)
+
+[node name="WeaponRig" type="Node2D" parent="."]
+visible = false
+
+[node name="WeaponSprite" type="Sprite2D" parent="WeaponRig"]
 centered = false
 offset = Vector2(-3, -7)
 

@@ -95,10 +95,9 @@ func _ready() -> void:
 func _setup_state_from_transition() -> void:
 	var transition_state: Dictionary = GameSession.consume_transition_state()
 	if transition_state.is_empty():
-		bag_slots = InventoryStateScript.create_empty_bag()
-		equipment_slots = InventoryStateScript.normalize_equipment(null)
-		InventoryStateScript.add_item(bag_slots, "Trail Ration", "consumable", 2)
-		InventoryStateScript.add_item(bag_slots, "Oak Buckler", "equipment", 1)
+		var starting_state: Dictionary = InventoryStateScript.create_default_starting_state()
+		bag_slots = InventoryStateScript.normalize_bag(starting_state.get("bag_slots", []))
+		equipment_slots = InventoryStateScript.normalize_equipment(starting_state.get("equipment_slots", {}))
 		return
 
 	bag_slots = InventoryStateScript.normalize_bag(transition_state.get("bag_slots", []))
@@ -2594,28 +2593,153 @@ func _perform_context_action() -> void:
 	player.call("try_attack")
 
 
-func _on_player_attack_requested(origin: Vector2, direction: Vector2, attack_distance: float) -> void:
-	var attack_value: int = _get_attack_value()
-	var hit_anything: bool = false
+func _on_player_attack_requested(attack_data: Dictionary) -> void:
+	var origin: Vector2 = attack_data.get("origin", player.global_position if player != null else Vector2.ZERO)
+	var direction: Vector2 = (attack_data.get("direction", Vector2.DOWN) as Vector2).normalized()
+	if direction == Vector2.ZERO:
+		direction = Vector2.DOWN
+
+	var weapon_name: String = str(attack_data.get("weapon_name", ""))
+	var attack_kind: String = str(attack_data.get("attack_kind", "melee_arc"))
+	var attack_range: float = float(attack_data.get("range", 58.0))
+	var damage_value: int = maxi(1, int(round(_get_attack_value() * float(attack_data.get("damage_scale", 1.0)))))
+	var hit_count: int = 0
+
+	match attack_kind:
+		"melee_thrust":
+			hit_count = _resolve_player_thrust_attack(origin, direction, attack_range, float(attack_data.get("thickness", 18.0)), int(attack_data.get("max_targets", 1)), damage_value)
+		"projectile":
+			hit_count = _resolve_player_ranged_attack(origin, direction, attack_range, str(attack_data.get("targeting", "auto_target")), float(attack_data.get("arc_dot", -0.2)), int(attack_data.get("max_targets", 1)), damage_value)
+		_:
+			hit_count = _resolve_player_arc_attack(origin, direction, attack_range, float(attack_data.get("arc_dot", 0.15)), int(attack_data.get("max_targets", 1)), damage_value)
+
+	if hit_count > 0:
+		combat_message = _build_player_hit_message(weapon_name, attack_kind, damage_value, hit_count)
+	else:
+		combat_message = _build_player_miss_message(weapon_name, attack_kind)
+	_update_overlay()
+
+
+func _resolve_player_arc_attack(origin: Vector2, direction: Vector2, attack_distance: float, arc_dot: float, max_targets: int, damage_value: int) -> int:
+	var hits: int = 0
+	for enemy in _get_attack_target_list(origin, direction, attack_distance, arc_dot, max_targets):
+		enemy.call("take_damage", damage_value, origin, true)
+		hits += 1
+	return hits
+
+
+func _resolve_player_thrust_attack(origin: Vector2, direction: Vector2, attack_distance: float, thickness: float, max_targets: int, damage_value: int) -> int:
+	var valid_targets: Array[Dictionary] = []
+	for enemy in _get_living_enemies():
+		var enemy_position: Vector2 = (enemy as Node2D).global_position
+		var offset: Vector2 = enemy_position - origin
+		var forward_distance: float = offset.dot(direction)
+		if forward_distance < 4.0 or forward_distance > attack_distance:
+			continue
+		var side_distance: float = absf(offset.cross(direction))
+		if side_distance > thickness:
+			continue
+		valid_targets.append({
+			"enemy": enemy,
+			"score": forward_distance
+		})
+
+	valid_targets.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("score", 0.0)) < float(b.get("score", 0.0))
+	)
+
+	var hits: int = 0
+	for target_data in valid_targets:
+		if hits >= max_targets:
+			break
+		var enemy: Node = target_data.get("enemy", null)
+		if enemy == null:
+			continue
+		enemy.call("take_damage", damage_value, origin, true)
+		hits += 1
+	return hits
+
+
+func _resolve_player_ranged_attack(origin: Vector2, direction: Vector2, attack_distance: float, targeting: String, arc_dot: float, max_targets: int, damage_value: int) -> int:
+	var targets: Array[Node] = _get_attack_target_list(origin, direction, attack_distance, arc_dot, max_targets, targeting == "auto_target")
+	var hits: int = 0
+	for enemy in targets:
+		enemy.call("take_damage", damage_value, origin, true)
+		hits += 1
+	return hits
+
+
+func _get_attack_target_list(origin: Vector2, direction: Vector2, attack_distance: float, arc_dot: float, max_targets: int, allow_fallback: bool = false) -> Array[Node]:
+	var scored_targets: Array[Dictionary] = []
+	var fallback_targets: Array[Dictionary] = []
+	for enemy in _get_living_enemies():
+		var enemy_position: Vector2 = (enemy as Node2D).global_position
+		var offset: Vector2 = enemy_position - origin
+		var distance: float = offset.length()
+		if distance > attack_distance:
+			continue
+		var aim_score: float = 1.0 if distance < 18.0 else direction.dot(offset.normalized())
+		var payload := {
+			"enemy": enemy,
+			"distance": distance,
+			"aim_score": aim_score
+		}
+		if aim_score >= arc_dot:
+			scored_targets.append(payload)
+		elif allow_fallback:
+			fallback_targets.append(payload)
+
+	scored_targets.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var aim_a: float = float(a.get("aim_score", -1.0))
+		var aim_b: float = float(b.get("aim_score", -1.0))
+		if is_equal_approx(aim_a, aim_b):
+			return float(a.get("distance", INF)) < float(b.get("distance", INF))
+		return aim_a > aim_b
+	)
+	fallback_targets.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("distance", INF)) < float(b.get("distance", INF))
+	)
+
+	var selected: Array[Node] = []
+	for target_data in scored_targets:
+		if selected.size() >= max_targets:
+			break
+		selected.append(target_data.get("enemy", null))
+	if selected.is_empty() and allow_fallback:
+		for target_data in fallback_targets:
+			if selected.size() >= max_targets:
+				break
+			selected.append(target_data.get("enemy", null))
+	return selected.filter(func(enemy: Node) -> bool: return enemy != null)
+
+
+func _get_living_enemies() -> Array[Node]:
+	var enemies: Array[Node] = []
 	for child in gameplay_root.get_children():
 		if not child.is_in_group("enemies"):
 			continue
 		if bool(child.get("defeated_state")):
 			continue
-		var enemy_position: Vector2 = (child as Node2D).global_position
-		var offset: Vector2 = enemy_position - origin
-		var distance: float = offset.length()
-		if distance > attack_distance:
-			continue
-		var facing: Vector2 = direction.normalized()
-		var aim_score: float = 1.0 if distance < 18.0 else facing.dot(offset.normalized())
-		if aim_score < 0.15:
-			continue
-		child.call("take_damage", attack_value, origin, true)
-		hit_anything = true
+		enemies.append(child)
+	return enemies
 
-	combat_message = "You hit for %d." % attack_value if hit_anything else "Your swing cuts the dark."
-	_update_overlay()
+
+func _build_player_hit_message(weapon_name: String, attack_kind: String, damage_value: int, hit_count: int) -> String:
+	var label: String = weapon_name if not weapon_name.is_empty() else "Attack"
+	if hit_count > 1:
+		return "%s hits %d foes for %d." % [label, hit_count, damage_value]
+	if attack_kind == "projectile":
+		return "%s lands for %d." % [label, damage_value]
+	return "%s hits for %d." % [label, damage_value]
+
+
+func _build_player_miss_message(weapon_name: String, attack_kind: String) -> String:
+	var label: String = weapon_name if not weapon_name.is_empty() else "Your attack"
+	if attack_kind == "projectile":
+		return "%s finds no target." % label
+	if attack_kind == "melee_thrust":
+		return "%s thrusts into empty dark." % label
+	return "%s cuts the dark." % label
 
 
 func _on_player_interacted(target: Node) -> void:
@@ -2625,7 +2749,17 @@ func _on_player_interacted(target: Node) -> void:
 	if target.is_in_group("dungeon_stairs"):
 		var target_depth_value: int = int(target.get("target_depth"))
 		if target_depth_value <= 0:
-			GameSession.change_scene_with_fade("res://scenes/world/world.tscn")
+			GameSession.set_transition_state({
+				"player_health": player_health,
+				"player_max_health": player_max_health,
+				"player_xp": player_xp,
+				"player_gold": player_gold,
+				"stat_allocations": stat_allocations,
+				"bag_slots": bag_slots,
+				"equipment_slots": equipment_slots,
+				"quick_item_name": quick_item_name
+			})
+			GameSession.transition_to_scene("res://scenes/world/world.tscn", "dungeon_return")
 			return
 		combat_message = "You descend to depth %d." % target_depth_value if target_depth_value > depth else "You climb to depth %d." % target_depth_value
 		var next_spawn_mode: String = SPAWN_UP_STAIRS if target_depth_value > depth else SPAWN_DOWN_STAIRS

@@ -35,6 +35,10 @@ Current direction:
 - player is modular and equipment-aware
 - combat is ARPG-style and feel-driven
 - attack/use/talk/context action behavior matters for mobile usability
+- weapon handling now supports per-weapon attack profiles, including ranged attacks, thrusts, and two-handed holds
+- player weapon posing is authored around weapon grip points, with per-direction idle, windup, strike/release, and recover poses
+- weapon poses now include facing-aware layer and visibility defaults so `W/A/S/D` can hide or foreground arms, hands, shields, and weapons differently
+- weapon sprite facing is controlled by centralized per-style rotation profiles plus per-weapon rotation offsets, rather than scattered one-off pose angles
 
 ### Enemies
 

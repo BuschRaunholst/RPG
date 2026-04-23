@@ -145,9 +145,7 @@ func can_drop_item(target_group: String, target_key: Variant, accepted_equip_slo
 	var target_item: Dictionary = _get_item(target_group, target_key)
 
 	if target_group == "equipment":
-		if str(source_item.get("kind", "")) != "equipment":
-			return false
-		if str(source_item.get("equip_slot", "")) != accepted_equip_slot:
+		if not InventoryStateScript.can_equip_item_to_slot(source_item, accepted_equip_slot, equipment_slots):
 			return false
 
 		if source_group == "equipment" and not target_item.is_empty():
@@ -352,6 +350,10 @@ func _update_item_popup(selected_item: Dictionary) -> void:
 		var equip_slot_name: String = str(selected_item.get("equip_slot", ""))
 		if not equip_slot_name.is_empty():
 			detail_lines.append("Slot: %s" % equip_slot_name.capitalize())
+		if equip_slot_name == "weapon":
+			var weapon_tags: Array[String] = InventoryStateScript.get_weapon_tags(item_name)
+			if not weapon_tags.is_empty():
+				detail_lines.append("Style: %s" % ", ".join(weapon_tags))
 
 		var item_stats: Dictionary = InventoryStateScript.get_item_stats(item_name)
 		var stat_line: String = _format_stat_block(item_stats)

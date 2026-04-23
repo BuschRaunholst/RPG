@@ -31,6 +31,16 @@ func _draw() -> void:
 	match item_name:
 		"Traveler Knife":
 			_draw_knife()
+		"Hunter Bow":
+			_draw_bow()
+		"Ash Staff":
+			_draw_staff()
+		"Willow Wand":
+			_draw_wand()
+		"Iron Greatsword":
+			_draw_greatsword()
+		"Woodsman Axe":
+			_draw_axe()
 		"Village Tunic":
 			_draw_tunic()
 		"Oak Buckler":
@@ -60,6 +70,61 @@ func _draw_knife() -> void:
 	draw_polyline(blade, OUTLINE_COLOR, 1.2, true)
 	draw_line(Vector2(13, 18), Vector2(7, 25), WOOD_COLOR, 4.0)
 	draw_line(Vector2(13, 18), Vector2(7, 25), OUTLINE_COLOR, 1.1)
+
+
+func _draw_bow() -> void:
+	draw_arc(Vector2(14, 15), 10.0, -1.2, 1.2, 18, WOOD_COLOR, 3.0)
+	draw_line(Vector2(18, 6), Vector2(18, 24), METAL_COLOR, 1.4)
+	draw_line(Vector2(13, 10), Vector2(28, 15), Color(0.84, 0.80, 0.70, 1.0), 1.2)
+	draw_line(Vector2(26, 14), Vector2(31, 9), METAL_COLOR, 2.0)
+
+
+func _draw_staff() -> void:
+	draw_line(Vector2(11, 25), Vector2(24, 5), WOOD_COLOR, 4.0)
+	draw_line(Vector2(11, 25), Vector2(24, 5), OUTLINE_COLOR, 1.0)
+	draw_circle(Vector2(26, 7), 4.5, Color(0.94, 0.58, 0.18, 1.0))
+	draw_arc(Vector2(26, 7), 4.5, 0.0, TAU, 18, OUTLINE_COLOR, 1.0)
+
+
+func _draw_wand() -> void:
+	draw_line(Vector2(12, 24), Vector2(23, 8), WOOD_COLOR.darkened(0.15), 3.2)
+	draw_line(Vector2(12, 24), Vector2(23, 8), OUTLINE_COLOR, 1.0)
+	draw_circle(Vector2(25, 6), 3.5, Color(0.48, 0.78, 0.98, 1.0))
+	draw_circle(Vector2(17, 12), 1.6, Color(0.88, 0.95, 1.0, 0.72))
+
+
+func _draw_greatsword() -> void:
+	draw_line(Vector2(8, 24), Vector2(18, 20), WOOD_COLOR, 3.0)
+	draw_line(Vector2(16, 21), Vector2(22, 19), OUTLINE_COLOR, 2.2)
+	draw_polygon(PackedVector2Array([
+		Vector2(22, 18),
+		Vector2(31, 7),
+		Vector2(33, 9),
+		Vector2(25, 21)
+	]), PackedColorArray([METAL_COLOR]))
+	draw_polyline(PackedVector2Array([
+		Vector2(22, 18),
+		Vector2(31, 7),
+		Vector2(33, 9),
+		Vector2(25, 21)
+	]), OUTLINE_COLOR, 1.1, true)
+
+
+func _draw_axe() -> void:
+	draw_line(Vector2(12, 25), Vector2(23, 7), WOOD_COLOR, 3.2)
+	draw_line(Vector2(12, 25), Vector2(23, 7), OUTLINE_COLOR, 1.0)
+	draw_polygon(PackedVector2Array([
+		Vector2(20, 8),
+		Vector2(30, 10),
+		Vector2(28, 18),
+		Vector2(21, 15)
+	]), PackedColorArray([METAL_COLOR]))
+	draw_polyline(PackedVector2Array([
+		Vector2(20, 8),
+		Vector2(30, 10),
+		Vector2(28, 18),
+		Vector2(21, 15)
+	]), OUTLINE_COLOR, 1.0, true)
 
 
 func _draw_tunic() -> void:

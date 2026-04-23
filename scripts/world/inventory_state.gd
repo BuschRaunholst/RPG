@@ -2,12 +2,152 @@ extends RefCounted
 
 const BAG_SLOT_COUNT := 20
 const EQUIPMENT_SLOT_ORDER := ["head", "weapon", "body", "boots", "offhand", "accessory", "trinket"]
+const DEFAULT_WEAPON_DATA := {
+	"weapon_type": "knife",
+	"hold_style": "one_hand",
+	"attack_kind": "melee_arc",
+	"range": 58.0,
+	"cooldown": 0.35,
+	"animation_duration": 0.12,
+	"arc_dot": 0.15,
+	"thickness": 18.0,
+	"targeting": "forward",
+	"max_targets": 1,
+	"damage_scale": 1.0,
+	"two_handed": false,
+	"ranged": false
+}
 const ITEM_DATA := {
 	"Traveler Knife": {
 		"equip_slot": "weapon",
 		"value": 12,
 		"stats": {
 			"attack": 6
+		},
+		"weapon": {
+			"weapon_type": "knife",
+			"hold_style": "one_hand",
+			"attack_kind": "melee_arc",
+			"range": 58.0,
+			"cooldown": 0.30,
+			"animation_duration": 0.12,
+			"arc_dot": 0.10,
+			"thickness": 18.0,
+			"targeting": "forward",
+			"max_targets": 1,
+			"damage_scale": 1.0,
+			"two_handed": false,
+			"ranged": false
+		}
+	},
+	"Hunter Bow": {
+		"equip_slot": "weapon",
+		"value": 24,
+		"stats": {
+			"attack": 5
+		},
+		"weapon": {
+			"weapon_type": "bow",
+			"hold_style": "bow",
+			"attack_kind": "projectile",
+			"range": 184.0,
+			"cooldown": 0.62,
+			"animation_duration": 0.22,
+			"arc_dot": -0.15,
+			"thickness": 18.0,
+			"targeting": "auto_target",
+			"max_targets": 1,
+			"damage_scale": 0.95,
+			"two_handed": true,
+			"ranged": true
+		}
+	},
+	"Ash Staff": {
+		"equip_slot": "weapon",
+		"value": 28,
+		"stats": {
+			"attack": 7
+		},
+		"weapon": {
+			"weapon_type": "staff",
+			"hold_style": "staff",
+			"attack_kind": "projectile",
+			"range": 164.0,
+			"cooldown": 0.58,
+			"animation_duration": 0.18,
+			"arc_dot": -0.2,
+			"thickness": 22.0,
+			"targeting": "auto_target",
+			"max_targets": 2,
+			"damage_scale": 1.05,
+			"two_handed": false,
+			"ranged": true
+		}
+	},
+	"Willow Wand": {
+		"equip_slot": "weapon",
+		"value": 22,
+		"stats": {
+			"attack": 4
+		},
+		"weapon": {
+			"weapon_type": "wand",
+			"hold_style": "wand",
+			"attack_kind": "projectile",
+			"range": 156.0,
+			"cooldown": 0.42,
+			"animation_duration": 0.16,
+			"arc_dot": -0.3,
+			"thickness": 16.0,
+			"targeting": "auto_target",
+			"max_targets": 1,
+			"damage_scale": 0.9,
+			"two_handed": false,
+			"ranged": true
+		}
+	},
+	"Iron Greatsword": {
+		"equip_slot": "weapon",
+		"value": 36,
+		"stats": {
+			"attack": 10
+		},
+		"weapon": {
+			"weapon_type": "greatsword",
+			"hold_style": "greatsword",
+			"attack_kind": "melee_arc",
+			"range": 74.0,
+			"cooldown": 0.55,
+			"animation_duration": 0.18,
+			"arc_dot": -0.10,
+			"thickness": 26.0,
+			"targeting": "forward",
+			"max_targets": 3,
+			"damage_scale": 1.2,
+			"two_handed": true,
+			"ranged": false
+		}
+	},
+	"Woodsman Axe": {
+		"equip_slot": "weapon",
+		"value": 26,
+		"stats": {
+			"attack": 7
+		},
+		"weapon": {
+			"weapon_type": "axe",
+			"hold_style": "axe",
+			"attack_kind": "melee_arc",
+			"range": 64.0,
+			"cooldown": 0.42,
+			"animation_duration": 0.15,
+			"arc_dot": 0.02,
+			"thickness": 22.0,
+			"targeting": "forward",
+			"max_targets": 2,
+			"damage_scale": 1.1,
+			"two_handed": false,
+			"ranged": false
 		}
 	},
 	"Village Tunic": {
@@ -75,6 +215,15 @@ const DEFAULT_EQUIPMENT := {
 		"equip_slot": "boots"
 	}
 }
+const DEFAULT_STARTING_BAG_ITEMS := [
+	{"name": "Trail Ration", "kind": "consumable", "count": 2},
+	{"name": "Oak Buckler", "kind": "equipment", "count": 1, "equip_slot": "offhand"},
+	{"name": "Hunter Bow", "kind": "equipment", "count": 1, "equip_slot": "weapon"},
+	{"name": "Ash Staff", "kind": "equipment", "count": 1, "equip_slot": "weapon"},
+	{"name": "Willow Wand", "kind": "equipment", "count": 1, "equip_slot": "weapon"},
+	{"name": "Iron Greatsword", "kind": "equipment", "count": 1, "equip_slot": "weapon"},
+	{"name": "Woodsman Axe", "kind": "equipment", "count": 1, "equip_slot": "weapon"}
+]
 
 
 static func create_empty_bag() -> Array[Dictionary]:
@@ -84,6 +233,33 @@ static func create_empty_bag() -> Array[Dictionary]:
 		bag.append({})
 
 	return bag
+
+
+static func create_default_bag() -> Array[Dictionary]:
+	var bag: Array[Dictionary] = create_empty_bag()
+	for item_data in DEFAULT_STARTING_BAG_ITEMS:
+		add_item(
+			bag,
+			str(item_data.get("name", "")),
+			str(item_data.get("kind", "consumable")),
+			int(item_data.get("count", 1)),
+			str(item_data.get("equip_slot", ""))
+		)
+	return bag
+
+
+static func create_default_equipment() -> Dictionary:
+	var equipment: Dictionary = {}
+	for slot_name in EQUIPMENT_SLOT_ORDER:
+		equipment[slot_name] = {}
+	return _apply_default_equipment(equipment)
+
+
+static func create_default_starting_state() -> Dictionary:
+	return {
+		"bag_slots": create_default_bag(),
+		"equipment_slots": create_default_equipment()
+	}
 
 
 static func normalize_bag(raw_value: Variant) -> Array[Dictionary]:
@@ -138,10 +314,10 @@ static func normalize_equipment(raw_value: Variant) -> Dictionary:
 		equipment[slot_name] = {}
 
 	if raw_value == null:
-		return _apply_default_equipment(equipment)
+		return create_default_equipment()
 
 	if typeof(raw_value) != TYPE_DICTIONARY:
-		return _apply_default_equipment(equipment)
+		return create_default_equipment()
 
 	var raw_dict: Dictionary = raw_value
 
@@ -281,6 +457,67 @@ static func get_item_stats(item_name: String) -> Dictionary:
 		return {}
 
 	return raw_stats.duplicate(true)
+
+
+static func get_weapon_data(item_name: String) -> Dictionary:
+	if not ITEM_DATA.has(item_name):
+		return DEFAULT_WEAPON_DATA.duplicate(true)
+
+	var item_info: Dictionary = ITEM_DATA[item_name]
+	var raw_weapon: Variant = item_info.get("weapon", {})
+	if typeof(raw_weapon) != TYPE_DICTIONARY:
+		return DEFAULT_WEAPON_DATA.duplicate(true)
+
+	var weapon_data: Dictionary = DEFAULT_WEAPON_DATA.duplicate(true)
+	for key in (raw_weapon as Dictionary).keys():
+		weapon_data[key] = raw_weapon[key]
+	return weapon_data
+
+
+static func get_weapon_tags(item_name: String) -> Array[String]:
+	var item_info: Dictionary = ITEM_DATA.get(item_name, {})
+	if item_info.is_empty() or str(item_info.get("equip_slot", "")) != "weapon":
+		return []
+
+	var weapon_data: Dictionary = get_weapon_data(item_name)
+	var tags: Array[String] = []
+	var weapon_type: String = str(weapon_data.get("weapon_type", "weapon"))
+	if not weapon_type.is_empty():
+		tags.append(weapon_type.capitalize())
+	if bool(weapon_data.get("ranged", false)):
+		tags.append("Ranged")
+	else:
+		tags.append("Melee")
+	if bool(weapon_data.get("two_handed", false)):
+		tags.append("Two-Handed")
+	return tags
+
+
+static func is_two_handed_item(item_name: String) -> bool:
+	var weapon_data: Dictionary = get_weapon_data(item_name)
+	return bool(weapon_data.get("two_handed", false))
+
+
+static func can_equip_item_to_slot(item_data: Dictionary, target_slot: String, raw_equipment_slots: Variant) -> bool:
+	var normalized_item: Dictionary = normalize_item(item_data)
+	if normalized_item.is_empty():
+		return false
+	if str(normalized_item.get("kind", "")) != "equipment":
+		return false
+	if str(normalized_item.get("equip_slot", "")) != target_slot:
+		return false
+
+	var equipment_slots: Dictionary = normalize_equipment(raw_equipment_slots)
+	if target_slot == "weapon" and is_two_handed_item(str(normalized_item.get("name", ""))):
+		return normalize_item(equipment_slots.get("offhand", {})).is_empty()
+
+	if target_slot == "offhand":
+		var equipped_weapon: Dictionary = normalize_item(equipment_slots.get("weapon", {}))
+		if equipped_weapon.is_empty():
+			return true
+		return not is_two_handed_item(str(equipped_weapon.get("name", "")))
+
+	return true
 
 
 static func get_consumable_effects(item_name: String) -> Dictionary:

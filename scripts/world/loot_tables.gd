@@ -111,6 +111,41 @@ static func _roll_low_tier_equipment(rng: RandomNumberGenerator) -> Dictionary:
 			"visual": "bag"
 		},
 		{
+			"name": "Hunter Bow",
+			"kind": EQUIPMENT_KIND,
+			"count": 1,
+			"equip_slot": "weapon",
+			"visual": "bag"
+		},
+		{
+			"name": "Ash Staff",
+			"kind": EQUIPMENT_KIND,
+			"count": 1,
+			"equip_slot": "weapon",
+			"visual": "bag"
+		},
+		{
+			"name": "Willow Wand",
+			"kind": EQUIPMENT_KIND,
+			"count": 1,
+			"equip_slot": "weapon",
+			"visual": "bag"
+		},
+		{
+			"name": "Iron Greatsword",
+			"kind": EQUIPMENT_KIND,
+			"count": 1,
+			"equip_slot": "weapon",
+			"visual": "bag"
+		},
+		{
+			"name": "Woodsman Axe",
+			"kind": EQUIPMENT_KIND,
+			"count": 1,
+			"equip_slot": "weapon",
+			"visual": "bag"
+		},
+		{
 			"name": "Village Tunic",
 			"kind": EQUIPMENT_KIND,
 			"count": 1,

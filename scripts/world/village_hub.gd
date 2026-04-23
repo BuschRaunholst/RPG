@@ -53,10 +53,21 @@ func _process(delta: float) -> void:
 
 
 func _setup_state() -> void:
-	bag_slots = InventoryStateScript.create_empty_bag()
-	equipment_slots = InventoryStateScript.normalize_equipment(null)
-	InventoryStateScript.add_item(bag_slots, "Trail Ration", "consumable", 2)
-	InventoryStateScript.add_item(bag_slots, "Oak Buckler", "equipment", 1)
+	var transition_state: Dictionary = GameSession.consume_transition_state()
+	if transition_state.is_empty():
+		var starting_state: Dictionary = InventoryStateScript.create_default_starting_state()
+		bag_slots = InventoryStateScript.normalize_bag(starting_state.get("bag_slots", []))
+		equipment_slots = InventoryStateScript.normalize_equipment(starting_state.get("equipment_slots", {}))
+		return
+
+	bag_slots = InventoryStateScript.normalize_bag(transition_state.get("bag_slots", []))
+	equipment_slots = InventoryStateScript.normalize_equipment(transition_state.get("equipment_slots", {}))
+	stat_allocations = ProgressionScript.normalize_allocations(transition_state.get("stat_allocations", {}))
+	player_xp = int(transition_state.get("player_xp", 0))
+	player_gold = int(transition_state.get("player_gold", 0))
+	player_max_health = int(transition_state.get("player_max_health", BASE_PLAYER_HEALTH))
+	player_health = clampi(int(transition_state.get("player_health", player_max_health)), 1, player_max_health)
+	quick_item_name = str(transition_state.get("quick_item_name", ""))
 
 
 func _bind_overlay() -> void:
@@ -219,7 +230,7 @@ func _add_collision(rect: Rect2) -> void:
 
 func _spawn_player() -> void:
 	player = PlayerScene.instantiate()
-	player.global_position = Vector2(636, 454)
+	player.global_position = _get_player_spawn_position()
 	gameplay_root.add_child(player)
 	player.attack_requested.connect(_on_player_attack_requested)
 	player.interacted.connect(_on_player_interacted)
@@ -236,6 +247,13 @@ func _spawn_player() -> void:
 	camera.zoom = Vector2(1.0, 1.0)
 	player.add_child(camera)
 	camera.make_current()
+
+
+func _get_player_spawn_position() -> Vector2:
+	var spawn_marker: String = GameSession.consume_spawn_marker()
+	if spawn_marker == "dungeon_return":
+		return Vector2(798, 268)
+	return Vector2(636, 454)
 
 
 func _spawn_npcs() -> void:
@@ -314,8 +332,13 @@ func _enter_dungeon() -> void:
 	GameSession.change_scene_with_fade("res://scenes/world/dungeon_run.tscn")
 
 
-func _on_player_attack_requested(_origin: Vector2, _direction: Vector2, _attack_distance: float) -> void:
-	status_message = "Steel whispers, but there is nothing to hit here."
+func _on_player_attack_requested(attack_data: Dictionary) -> void:
+	var weapon_name: String = str(attack_data.get("weapon_name", "Steel"))
+	var attack_kind: String = str(attack_data.get("attack_kind", "melee_arc"))
+	if attack_kind == "projectile":
+		status_message = "%s hums, but there is nothing to target here." % weapon_name
+	else:
+		status_message = "%s whispers, but there is nothing to hit here." % weapon_name
 	_update_overlay()
 
 

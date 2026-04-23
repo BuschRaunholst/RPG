@@ -7,7 +7,7 @@
 [ext_resource type="Script" path="res://scripts/ui/item_icon.gd" id="5_itemicon"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_joystick_plate"]
-bg_color = Color(0.0509804, 0.0666667, 0.0745098, 0.025)
+bg_color = Color(0.0588235, 0.0705882, 0.0784314, 0.08)
 corner_radius_top_left = 56
 corner_radius_top_right = 56
 corner_radius_bottom_right = 56
@@ -16,12 +16,12 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.909804, 0.894118, 0.741176, 0.025)
-shadow_color = Color(0, 0, 0, 0.05)
-shadow_size = 2
+border_color = Color(0.0705882, 0.0823529, 0.0941176, 0.28)
+shadow_color = Color(0, 0, 0, 0.12)
+shadow_size = 4
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_joystick_outer"]
-bg_color = Color(0.917647, 0.952941, 0.905882, 0.045)
+bg_color = Color(0.862745, 0.827451, 0.576471, 0.08)
 corner_radius_top_left = 64
 corner_radius_top_right = 64
 corner_radius_bottom_right = 64
@@ -30,10 +30,10 @@ border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.909804, 0.894118, 0.741176, 0.09)
+border_color = Color(0.862745, 0.827451, 0.576471, 0.18)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_joystick_inner"]
-bg_color = Color(0.917647, 0.952941, 0.905882, 0.085)
+bg_color = Color(0.101961, 0.129412, 0.145098, 0.34)
 corner_radius_top_left = 54
 corner_radius_top_right = 54
 corner_radius_bottom_right = 54
@@ -42,17 +42,17 @@ border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(1, 1, 1, 0.04)
+border_color = Color(0, 0, 0, 0.12)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_knob_shadow"]
-bg_color = Color(0, 0, 0, 0.12)
+bg_color = Color(0, 0, 0, 0.18)
 corner_radius_top_left = 28
 corner_radius_top_right = 28
 corner_radius_bottom_right = 28
 corner_radius_bottom_left = 28
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_knob"]
-bg_color = Color(0.952941, 0.956863, 0.905882, 0.92)
+bg_color = Color(0.862745, 0.827451, 0.576471, 0.9)
 corner_radius_top_left = 28
 corner_radius_top_right = 28
 corner_radius_bottom_right = 28
@@ -61,9 +61,9 @@ border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.862745, 0.827451, 0.576471, 0.22)
-shadow_color = Color(0, 0, 0, 0.1)
-shadow_size = 5
+border_color = Color(0.964706, 0.933333, 0.654902, 0.28)
+shadow_color = Color(0, 0, 0, 0.16)
+shadow_size = 6
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_action_button"]
 bg_color = Color(0.0745098, 0.0901961, 0.101961, 0.86)

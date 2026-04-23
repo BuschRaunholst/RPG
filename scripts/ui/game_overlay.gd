@@ -459,19 +459,18 @@ func _apply_responsive_layout() -> void:
 	health_label.add_theme_font_size_override("font_size", 10 if compact else 11)
 	xp_label.add_theme_font_size_override("font_size", 10 if compact else 11)
 
-	location_label.anchor_left = 0.0
-	location_label.anchor_right = 1.0
+	location_label.anchor_left = 0.5
+	location_label.anchor_right = 0.5
 	location_label.add_theme_font_size_override("font_size", 15 if compact else 18)
+	var location_width: float = minf(viewport_size.x - side_margin * 2.0, 360.0 if compact else 420.0)
 	if compact:
-		location_label.offset_left = side_margin
-		location_label.offset_right = -side_margin
+		location_label.offset_left = -location_width * 0.5
+		location_label.offset_right = location_width * 0.5
 		location_label.offset_top = top_margin + vitals_height + 2.0
 		location_label.offset_bottom = location_label.offset_top + 24.0
 	else:
-		var header_left: float = side_margin + vitals_width + HUD_GAP
-		var header_right: float = side_margin + top_menu_width + HUD_GAP
-		location_label.offset_left = header_left
-		location_label.offset_right = -header_right
+		location_label.offset_left = -location_width * 0.5
+		location_label.offset_right = location_width * 0.5
 		location_label.offset_top = top_margin + 2.0
 		location_label.offset_bottom = location_label.offset_top + 26.0
 

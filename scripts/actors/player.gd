@@ -1,11 +1,18 @@
 extends CharacterBody2D
 
+const InventoryStateScript = preload("res://scripts/world/inventory_state.gd")
+const TUNIC_FRAMES = preload("res://assets/art/characters/player_clothes_village_tunic_4dir_64_frames.tres")
+const BOOTS_FRAMES = preload("res://assets/art/characters/player_boots_worn_4dir_64_frames.tres")
+const ARM_SKIN_DARK := Color(0.48, 0.30, 0.20, 1.0)
+const ARM_SKIN := Color(0.66, 0.43, 0.28, 1.0)
+const ARM_TUNIC_DARK := Color(0.17, 0.20, 0.16, 1.0)
+
 @export var move_speed: float = 180.0
 @export var attack_range: float = 58.0
 @export var attack_cooldown: float = 0.35
 
 signal interacted(target: Node)
-signal attack_requested(origin: Vector2, direction: Vector2, attack_distance: float)
+signal attack_requested(attack_data: Dictionary)
 signal context_action_requested
 
 @onready var body: AnimatedSprite2D = $Body
@@ -14,6 +21,9 @@ signal context_action_requested
 @onready var left_arm_pivot: Node2D = $LeftArmPivot
 @onready var left_arm_sprite: Sprite2D = $LeftArmPivot/LeftArmSprite
 @onready var shield_socket: Node2D = $LeftArmPivot/ShieldSocket
+@onready var left_weapon_socket: Node2D = $LeftArmPivot/LeftWeaponSocket
+@onready var left_weapon_pivot: Node2D = $LeftArmPivot/LeftWeaponSocket/LeftWeaponPivot
+@onready var left_weapon_sprite: Sprite2D = $LeftArmPivot/LeftWeaponSocket/LeftWeaponPivot/LeftWeaponSprite
 @onready var shield_pivot: Node2D = $LeftArmPivot/ShieldSocket/ShieldPivot
 @onready var shield_sprite: Sprite2D = $LeftArmPivot/ShieldSocket/ShieldPivot/ShieldSprite
 @onready var back_shield_pivot: Node2D = $BackShieldPivot
@@ -23,13 +33,9 @@ signal context_action_requested
 @onready var weapon_socket: Node2D = $RightArmPivot/WeaponSocket
 @onready var weapon_pivot: Node2D = $RightArmPivot/WeaponSocket/WeaponPivot
 @onready var weapon_sprite: Sprite2D = $RightArmPivot/WeaponSocket/WeaponPivot/WeaponSprite
+@onready var weapon_rig: Node2D = $WeaponRig
+@onready var weapon_rig_sprite: Sprite2D = $WeaponRig/WeaponSprite
 @onready var interaction_detector: Area2D = $InteractionDetector
-
-const TUNIC_FRAMES = preload("res://assets/art/characters/player_clothes_village_tunic_4dir_64_frames.tres")
-const BOOTS_FRAMES = preload("res://assets/art/characters/player_boots_worn_4dir_64_frames.tres")
-const ARM_SKIN_DARK := Color(0.48, 0.30, 0.20, 1.0)
-const ARM_SKIN := Color(0.66, 0.43, 0.28, 1.0)
-const ARM_TUNIC_DARK := Color(0.17, 0.20, 0.16, 1.0)
 
 var can_move: bool = true
 var nearby_interactable: Node = null
@@ -37,6 +43,7 @@ var tap_interaction_range: float = 56.0
 var facing_direction: Vector2 = Vector2.DOWN
 var attack_cooldown_remaining: float = 0.0
 var attack_feedback_remaining: float = 0.0
+var attack_feedback_duration: float = 0.12
 var hurt_feedback_remaining: float = 0.0
 var body_base_position: Vector2 = Vector2.ZERO
 var highlighted_interactable: Node = null
@@ -47,6 +54,8 @@ var equipped_body_name: String = ""
 var weapon_textures: Dictionary = {}
 var shield_textures: Dictionary = {}
 var arm_texture: Texture2D
+var equipped_weapon_profile: Dictionary = InventoryStateScript.DEFAULT_WEAPON_DATA.duplicate(true)
+const ARM_REACH := 17.0
 
 
 func _ready() -> void:
@@ -63,6 +72,9 @@ func _ready() -> void:
 	right_arm_sprite.texture = arm_texture
 	left_arm_sprite.offset = Vector2(-3.0, 0.0)
 	right_arm_sprite.offset = Vector2(-3.0, 0.0)
+	left_weapon_sprite.visible = false
+	weapon_sprite.visible = false
+	weapon_rig.visible = false
 	_update_weapon_visual()
 
 
@@ -87,7 +99,6 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var input_vector := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-
 	if input_vector.length() > 0.0:
 		facing_direction = input_vector.normalized()
 
@@ -98,7 +109,6 @@ func _physics_process(delta: float) -> void:
 
 func set_can_move(value: bool) -> void:
 	can_move = value
-
 	if not can_move:
 		velocity = Vector2.ZERO
 
@@ -186,9 +196,28 @@ func try_attack() -> bool:
 	if not can_attack_now():
 		return false
 
-	attack_cooldown_remaining = attack_cooldown
-	attack_feedback_remaining = 0.12
-	attack_requested.emit(global_position, facing_direction, attack_range)
+	var attack_profile: Dictionary = _get_current_attack_profile()
+	attack_feedback_duration = float(attack_profile.get("animation_duration", 0.12))
+	attack_cooldown_remaining = float(attack_profile.get("cooldown", attack_cooldown))
+	attack_feedback_remaining = attack_feedback_duration
+
+	var aim_direction: Vector2 = facing_direction.normalized()
+	if aim_direction == Vector2.ZERO:
+		aim_direction = Vector2.DOWN
+
+	attack_requested.emit({
+		"origin": global_position,
+		"direction": aim_direction,
+		"weapon_name": equipped_weapon_name,
+		"attack_kind": str(attack_profile.get("attack_kind", "melee_arc")),
+		"range": float(attack_profile.get("range", attack_range)),
+		"arc_dot": float(attack_profile.get("arc_dot", 0.15)),
+		"thickness": float(attack_profile.get("thickness", 18.0)),
+		"targeting": str(attack_profile.get("targeting", "forward")),
+		"max_targets": int(attack_profile.get("max_targets", 1)),
+		"damage_scale": float(attack_profile.get("damage_scale", 1.0)),
+		"ranged": bool(attack_profile.get("ranged", false))
+	})
 	return true
 
 
@@ -204,6 +233,8 @@ func set_equipment_visuals(equipment_slots: Dictionary) -> void:
 	var boots_item: Dictionary = equipment_slots.get("boots", {})
 	equipped_weapon_name = str(weapon_item.get("name", ""))
 	equipped_offhand_name = str(offhand_item.get("name", ""))
+	equipped_weapon_profile = _get_current_attack_profile()
+
 	var body_name: String = str(body_item.get("name", ""))
 	equipped_body_name = body_name
 	var boots_name: String = str(boots_item.get("name", ""))
@@ -232,13 +263,13 @@ func _update_animation(input_vector: Vector2) -> void:
 func _get_animation_direction_name() -> String:
 	if absf(facing_direction.x) > absf(facing_direction.y):
 		return "left" if facing_direction.x < 0.0 else "right"
-
 	return "up" if facing_direction.y < 0.0 else "down"
 
 
 func _update_feedback_visuals() -> void:
-	var attack_progress: float = attack_feedback_remaining / 0.12 if attack_feedback_remaining > 0.0 else 0.0
-	var attack_offset: Vector2 = facing_direction.normalized() * (sin(attack_progress * PI) * 5.0)
+	var attack_progress_remaining: float = attack_feedback_remaining / attack_feedback_duration if attack_feedback_remaining > 0.0 else 0.0
+	var attack_t: float = 1.0 - attack_progress_remaining if attack_feedback_remaining > 0.0 else 0.0
+	var attack_offset: Vector2 = facing_direction.normalized() * (sin(attack_progress_remaining * PI) * 5.0)
 	for layer in animated_layers:
 		if layer == null:
 			continue
@@ -253,7 +284,7 @@ func _update_feedback_visuals() -> void:
 			if layer != null:
 				layer.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
-	_update_weapon_pose(attack_progress, attack_offset)
+	_update_weapon_pose(attack_t, attack_offset)
 
 
 func _sync_layer_animation(animation_name: StringName) -> void:
@@ -268,6 +299,11 @@ func _sync_layer_animation(animation_name: StringName) -> void:
 
 func _build_weapon_textures() -> void:
 	weapon_textures["Traveler Knife"] = _create_knife_texture()
+	weapon_textures["Hunter Bow"] = _create_bow_texture()
+	weapon_textures["Ash Staff"] = _create_staff_texture()
+	weapon_textures["Willow Wand"] = _create_wand_texture()
+	weapon_textures["Iron Greatsword"] = _create_greatsword_texture()
+	weapon_textures["Woodsman Axe"] = _create_axe_texture()
 
 
 func _build_shield_textures() -> void:
@@ -276,187 +312,583 @@ func _build_shield_textures() -> void:
 
 
 func _update_weapon_visual() -> void:
-	if right_arm_pivot == null or left_arm_pivot == null or weapon_sprite == null or shield_sprite == null or back_shield_sprite == null:
+	if weapon_rig_sprite == null or shield_sprite == null or back_shield_sprite == null:
 		return
 
-	if equipped_weapon_name.is_empty() or not weapon_textures.has(equipped_weapon_name):
-		right_arm_pivot.visible = true
-		left_arm_pivot.visible = true
-		weapon_sprite.visible = false
+	if weapon_textures.has(equipped_weapon_name):
+		var weapon_texture: Texture2D = weapon_textures[equipped_weapon_name]
+		weapon_rig_sprite.texture = weapon_texture
+		weapon_rig.visible = true
 	else:
-		weapon_sprite.texture = weapon_textures[equipped_weapon_name]
-		weapon_sprite.visible = true
+		weapon_rig_sprite.texture = null
+		weapon_rig.visible = false
 
-	if equipped_offhand_name.is_empty() or not shield_textures.has(equipped_offhand_name):
-		shield_sprite.visible = false
-		back_shield_sprite.visible = false
-	else:
+	if shield_textures.has(equipped_offhand_name):
 		shield_sprite.texture = shield_textures[equipped_offhand_name]
-		back_shield_sprite.texture = shield_textures[equipped_offhand_name]
-		shield_sprite.visible = true
+		back_shield_sprite.texture = shield_textures.get("%s Edge" % equipped_offhand_name, shield_textures[equipped_offhand_name])
+	else:
+		shield_sprite.texture = null
+		back_shield_sprite.texture = null
 
+	weapon_sprite.visible = false
+	left_weapon_sprite.visible = false
 	right_arm_pivot.visible = true
 	left_arm_pivot.visible = true
 	_update_weapon_pose(0.0, Vector2.ZERO)
 
 
-func _update_weapon_pose(attack_progress: float, attack_offset: Vector2) -> void:
-	if left_arm_pivot == null or right_arm_pivot == null or weapon_socket == null or weapon_pivot == null or weapon_sprite == null or shield_socket == null or shield_pivot == null or shield_sprite == null or back_shield_pivot == null or back_shield_sprite == null:
+
+
+func _get_swing_angles(direction_name: String, scale: float) -> Dictionary:
+	match direction_name:
+		"left":
+			return {"windup": 76.0 * scale, "follow": -22.0 * scale}
+		"right":
+			return {"windup": -76.0 * scale, "follow": 22.0 * scale}
+		"up":
+			return {"windup": -34.0 * scale, "follow": 18.0 * scale}
+		_:
+			return {"windup": 58.0 * scale, "follow": -30.0 * scale}
+
+
+func _update_weapon_pose(attack_t: float, attack_offset: Vector2) -> void:
+	if left_arm_pivot == null or right_arm_pivot == null or weapon_rig == null:
 		return
 
 	var direction_name: String = _get_animation_direction_name()
-	var has_weapon: bool = not equipped_weapon_name.is_empty() and weapon_textures.has(equipped_weapon_name)
-	var has_shield: bool = not equipped_offhand_name.is_empty() and shield_textures.has(equipped_offhand_name)
 	var weapon_profile: Dictionary = _get_weapon_visual_profile(equipped_weapon_name)
-	var right_pose: Dictionary = _get_right_arm_pose(direction_name)
-	var left_pose: Dictionary = _get_left_arm_pose(direction_name)
-	var is_attacking: bool = attack_progress > 0.0
-	var attack_phase: float = clampf(1.0 - attack_progress, 0.0, 1.0) if attack_progress > 0.0 else 0.0
-	var swing_degrees: float = 0.0
-	if is_attacking:
-		swing_degrees = lerpf(float(right_pose.get("windup_degrees", -25.0)), float(right_pose.get("follow_degrees", 35.0)), _smooth_attack_phase(attack_phase)) * 1.3
+	var style: String = str(weapon_profile.get("hold_style", "one_hand"))
+	var has_weapon: bool = weapon_textures.has(equipped_weapon_name)
+	var can_show_shield: bool = shield_textures.has(equipped_offhand_name) and not bool(weapon_profile.get("two_handed", false))
+	var direction_rig: Dictionary = _get_direction_rig(direction_name)
+	var pose: Dictionary = _sample_pose(style, direction_name, attack_t)
+	pose = _apply_pose_layer_defaults(pose, style, direction_name)
+	pose["weapon_rotation"] = _get_weapon_facing_rotation(style, direction_name, attack_t, float(pose.get("weapon_rotation", 0.0))) + _get_weapon_rotation_offset(weapon_profile, direction_name)
 
-	var show_left_arm: bool = _should_show_left_arm(direction_name, is_attacking)
-	var show_front_shield: bool = has_shield and _should_show_front_shield(direction_name)
-	var show_back_shield: bool = has_shield and _should_show_back_shield(direction_name)
-	left_arm_pivot.visible = show_left_arm or show_front_shield
-	left_arm_pivot.position = (left_pose.get("shoulder", Vector2.ZERO) as Vector2) + attack_offset
-	left_arm_pivot.rotation = deg_to_rad(float(left_pose.get("arm_degrees", 0.0)))
-	left_arm_pivot.z_index = int(left_pose.get("z_index", 4))
-	left_arm_sprite.visible = show_left_arm
-	left_arm_sprite.flip_h = false
-	shield_sprite.visible = show_front_shield
-	if show_front_shield:
-		shield_sprite.texture = _get_shield_texture(direction_name)
-	shield_socket.position = left_pose.get("shield_socket", Vector2(0.0, 16.0)) as Vector2
-	shield_pivot.position = Vector2.ZERO
-	shield_pivot.rotation = deg_to_rad(float(left_pose.get("shield_degrees", 0.0)))
-	shield_sprite.offset = left_pose.get("shield_offset", Vector2(-7.0, -8.0)) as Vector2
-	shield_sprite.z_index = 0
-	back_shield_pivot.visible = show_back_shield
-	back_shield_sprite.visible = show_back_shield
-	if show_back_shield:
-		back_shield_sprite.texture = shield_textures.get("Oak Buckler", null)
+	var left_shoulder: Vector2 = (direction_rig.get("left_shoulder", Vector2.ZERO) as Vector2) + attack_offset
+	var right_shoulder: Vector2 = (direction_rig.get("right_shoulder", Vector2.ZERO) as Vector2) + attack_offset
+	var weapon_position: Vector2 = (pose.get("weapon_position", Vector2.ZERO) as Vector2) + attack_offset
+	var weapon_rotation_degrees: float = float(pose.get("weapon_rotation", 0.0))
+
+	weapon_rig.visible = has_weapon and bool(pose.get("show_weapon", true))
+	weapon_rig.position = weapon_position
+	weapon_rig.rotation = deg_to_rad(weapon_rotation_degrees)
+	weapon_rig.z_index = int(pose.get("weapon_z", direction_rig.get("weapon_z", 6)))
+	weapon_rig_sprite.offset = pose.get("weapon_offset", weapon_profile.get("offset", Vector2(-3.0, -7.0))) as Vector2
+	weapon_rig_sprite.flip_h = bool(pose.get("weapon_flip_h", false))
+
+	var grip_offset: Vector2 = weapon_profile.get("grip_offset", weapon_rig_sprite.offset) as Vector2
+	var right_target: Vector2 = _weapon_local_to_player(weapon_position, weapon_rotation_degrees, pose.get("right_hand_grip", Vector2.ZERO) as Vector2, grip_offset)
+	var left_target_variant: Variant = pose.get("left_hand_grip", null)
+	var left_target: Vector2 = _free_hand_target(direction_name, "left") + attack_offset
+	if left_target_variant is Vector2:
+		left_target = _weapon_local_to_player(weapon_position, weapon_rotation_degrees, left_target_variant as Vector2, grip_offset)
+
+	var uses_relaxed_offhand: bool = _uses_one_hand_shield_stance(style) and not left_target_variant is Vector2
+	var uses_relaxed_shield: bool = can_show_shield and uses_relaxed_offhand
+	if uses_relaxed_offhand:
+		left_target = _relaxed_offhand_target(direction_name) + attack_offset
+		pose["show_left_arm"] = direction_name != "right"
+		if direction_name == "up":
+			pose["show_right_arm"] = true
+
+	var show_left_arm: bool = bool(pose.get("show_left_arm", true))
+	var show_right_arm: bool = bool(pose.get("show_right_arm", true))
+	_apply_arm_pose(left_arm_pivot, left_arm_sprite, left_shoulder, left_target, show_left_arm, int(pose.get("left_arm_z", direction_rig.get("left_arm_z", 4))))
+	_apply_arm_pose(right_arm_pivot, right_arm_sprite, right_shoulder, right_target, show_right_arm, int(pose.get("right_arm_z", direction_rig.get("right_arm_z", 5))))
+
+	shield_socket.position = _get_shield_socket_position(direction_rig, direction_name, uses_relaxed_shield)
+	shield_pivot.rotation = deg_to_rad(_get_shield_rotation(direction_rig, direction_name, uses_relaxed_shield))
+	shield_sprite.offset = _get_shield_offset(direction_rig, direction_name, uses_relaxed_shield)
+	shield_sprite.visible = can_show_shield and bool(direction_rig.get("show_shield_front", false))
+
 	var back_shield_pose: Dictionary = _get_back_shield_pose(direction_name)
 	back_shield_pivot.position = (back_shield_pose.get("position", Vector2.ZERO) as Vector2) + attack_offset
 	back_shield_pivot.rotation = deg_to_rad(float(back_shield_pose.get("degrees", 0.0)))
 	back_shield_pivot.z_index = int(back_shield_pose.get("z_index", -1))
 	back_shield_sprite.offset = back_shield_pose.get("offset", Vector2(-8.0, -9.0)) as Vector2
-
-	var show_right_arm: bool = _should_show_right_arm(direction_name, is_attacking)
-	var show_weapon: bool = has_weapon and _should_show_right_weapon(direction_name, is_attacking)
-	right_arm_pivot.visible = show_right_arm or show_weapon
-	right_arm_pivot.position = (right_pose.get("shoulder", Vector2.ZERO) as Vector2) + attack_offset
-	right_arm_pivot.rotation = deg_to_rad(float(right_pose.get("arm_degrees", 0.0)) + swing_degrees)
-	right_arm_pivot.z_index = -1 if show_weapon and not show_right_arm else int(right_pose.get("z_index", 5))
-	right_arm_sprite.visible = show_right_arm
-	right_arm_sprite.flip_h = false
-
-	weapon_sprite.visible = show_weapon
-	weapon_socket.position = right_pose.get("socket", weapon_profile.get("socket", Vector2(0.0, 17.0))) as Vector2
-	weapon_pivot.position = Vector2.ZERO
-	weapon_pivot.rotation = deg_to_rad(float(right_pose.get("weapon_degrees", weapon_profile.get("rotation_degrees", 0.0))))
-	weapon_sprite.flip_h = bool(right_pose.get("weapon_flip_h", weapon_profile.get("flip_h", false)))
+	back_shield_pivot.visible = can_show_shield and bool(direction_rig.get("show_shield_back", false))
+	back_shield_sprite.visible = back_shield_pivot.visible
 
 
-func _get_right_arm_pose(direction_name: String) -> Dictionary:
-	match direction_name:
-		"left":
-			return {
-				"shoulder": Vector2(2.0, -18.0),
-				"socket": Vector2(0.0, 13.0),
-				"arm_degrees": 0.0,
-				"windup_degrees": 76.0,
-				"follow_degrees": -22.0,
-				"weapon_degrees": 180.0,
-				"z_index": 5
-			}
-		"right":
-			return {
-				"shoulder": Vector2(3.0, -18.0),
-				"socket": Vector2(0.0, 17.0),
-				"arm_degrees": 0.0,
-				"windup_degrees": -76.0,
-				"follow_degrees": 22.0,
-				"weapon_degrees": 0.0,
-				"z_index": 5
-			}
-		"up":
-			return {
-				"shoulder": Vector2(8.0, -18.0),
-				"socket": Vector2(0.0, 17.0),
-				"arm_degrees": 0.0,
-				"windup_degrees": -34.0,
-				"follow_degrees": 18.0,
-				"weapon_degrees": -12.0,
-				"z_index": 3
-			}
+func _sample_pose(style: String, direction_name: String, attack_t: float) -> Dictionary:
+	var poses: Dictionary = _get_pose_set(style, direction_name)
+	if attack_t <= 0.0:
+		return (poses.get("idle", {}) as Dictionary).duplicate(true)
+	if attack_t < 0.24:
+		return _blend_pose_dicts(poses.get("idle", {}), poses.get("windup", {}), attack_t / 0.24)
+	if attack_t < 0.56:
+		return _blend_pose_dicts(poses.get("windup", {}), poses.get("strike", {}), (attack_t - 0.24) / 0.32)
+	if attack_t < 0.80:
+		return _blend_pose_dicts(poses.get("strike", {}), poses.get("recover", {}), (attack_t - 0.56) / 0.24)
+	return _blend_pose_dicts(poses.get("recover", {}), poses.get("idle", {}), (attack_t - 0.80) / 0.20)
+
+
+func _get_weapon_facing_rotation(style: String, direction_name: String, attack_t: float, fallback_degrees: float) -> float:
+	var rotations: Dictionary = _get_weapon_rotation_profile(style, direction_name)
+	if rotations.is_empty():
+		return fallback_degrees
+	if attack_t <= 0.0:
+		return float(rotations.get("idle", fallback_degrees))
+	if attack_t < 0.24:
+		return _lerp_degrees(float(rotations.get("idle", fallback_degrees)), float(rotations.get("windup", fallback_degrees)), attack_t / 0.24)
+	if attack_t < 0.56:
+		return _lerp_degrees(float(rotations.get("windup", fallback_degrees)), float(rotations.get("strike", fallback_degrees)), (attack_t - 0.24) / 0.32)
+	if attack_t < 0.80:
+		return _lerp_degrees(float(rotations.get("strike", fallback_degrees)), float(rotations.get("recover", fallback_degrees)), (attack_t - 0.56) / 0.24)
+	return _lerp_degrees(float(rotations.get("recover", fallback_degrees)), float(rotations.get("idle", fallback_degrees)), (attack_t - 0.80) / 0.20)
+
+
+func _get_weapon_rotation_profile(style: String, direction_name: String) -> Dictionary:
+	match style:
+		"bow":
+			return _bow_rotation_profile(direction_name)
+		"staff":
+			return _staff_vertical_rotation_profile()
+		"greatsword":
+			return _heavy_swing_rotation_profile(direction_name)
+		"wand":
+			return _short_blade_rotation_profile(direction_name)
+		"axe":
+			return _short_blade_rotation_profile(direction_name)
 		_:
-			return {
-				"shoulder": Vector2(-10.0, -19.0),
-				"socket": Vector2(0.0, 16.0),
-				"arm_degrees": 0.0,
-				"windup_degrees": 58.0,
-				"follow_degrees": -30.0,
-				"weapon_degrees": 180.0,
-				"z_index": 5
-			}
+			return _short_blade_rotation_profile(direction_name)
 
 
-func _get_left_arm_pose(direction_name: String) -> Dictionary:
+func _point_out_rotation_profile(direction_name: String, windup_degrees: float) -> Dictionary:
+	var idle: float = _point_out_degrees(direction_name)
+	var windup_sign: float = -1.0 if direction_name in ["right", "down"] else 1.0
+	return {
+		"idle": idle,
+		"windup": idle + windup_degrees * windup_sign,
+		"strike": idle,
+		"recover": idle
+	}
+
+
+func _short_blade_rotation_profile(direction_name: String) -> Dictionary:
+	match direction_name:
+		"left":
+			return {"idle": 210.0, "windup": 268.0, "strike": 152.0, "recover": 206.0}
+		"right":
+			return {"idle": -30.0, "windup": -88.0, "strike": 28.0, "recover": -26.0}
+		"up":
+			return {"idle": -52.0, "windup": -76.0, "strike": -30.0, "recover": -52.0}
+		_:
+			return {"idle": 210.0, "windup": 246.0, "strike": 174.0, "recover": 210.0}
+
+
+func _heavy_swing_rotation_profile(direction_name: String) -> Dictionary:
+	match direction_name:
+		"left":
+			return {"idle": -90.0, "windup": -26.0, "strike": -152.0, "recover": -96.0}
+		"right":
+			return {"idle": 90.0, "windup": 26.0, "strike": 152.0, "recover": 96.0}
+		"up":
+			return {"idle": 0.0, "windup": 58.0, "strike": -48.0, "recover": 4.0}
+		_:
+			return {"idle": 180.0, "windup": 238.0, "strike": 128.0, "recover": 176.0}
+
+
+func _staff_vertical_rotation_profile() -> Dictionary:
+	return {"idle": 0.0, "windup": 0.0, "strike": 0.0, "recover": 0.0}
+
+
+func _bow_rotation_profile(direction_name: String) -> Dictionary:
+	match direction_name:
+		"up", "down":
+			return {"idle": 90.0, "windup": 90.0, "strike": 90.0, "recover": 90.0}
+		_:
+			return {"idle": 0.0, "windup": 0.0, "strike": 0.0, "recover": 0.0}
+
+
+func _point_out_degrees(direction_name: String) -> float:
+	match direction_name:
+		"left":
+			return -90.0
+		"right":
+			return 90.0
+		"up":
+			return 0.0
+		_:
+			return 180.0
+
+
+func _lerp_degrees(from_degrees: float, to_degrees: float, weight: float) -> float:
+	return rad_to_deg(lerp_angle(deg_to_rad(from_degrees), deg_to_rad(to_degrees), weight))
+
+
+func _get_weapon_rotation_offset(weapon_profile: Dictionary, direction_name: String) -> float:
+	var offsets: Variant = weapon_profile.get("rotation_offsets", {})
+	if offsets is Dictionary:
+		return float((offsets as Dictionary).get(direction_name, (offsets as Dictionary).get("default", 0.0)))
+	return 0.0
+
+
+func _get_pose_set(style: String, direction_name: String) -> Dictionary:
+	match style:
+		"bow":
+			return _get_bow_pose_set(direction_name)
+		"staff":
+			return _get_staff_pose_set(direction_name)
+		"greatsword":
+			return _get_greatsword_pose_set(direction_name)
+		"wand":
+			return _get_wand_pose_set(direction_name)
+		"axe":
+			return _get_axe_pose_set(direction_name)
+		_:
+			return _get_one_hand_pose_set(direction_name)
+
+
+func _get_direction_rig(direction_name: String) -> Dictionary:
 	match direction_name:
 		"left":
 			return {
-				"shoulder": Vector2(-5.0, -18.0),
-				"arm_degrees": 0.0,
+				"left_shoulder": Vector2(-5.0, -18.0),
+				"right_shoulder": Vector2(2.0, -18.0),
+				"left_arm_z": 4,
+				"right_arm_z": 5,
 				"shield_socket": Vector2(0.0, 13.0),
-				"shield_degrees": 3.0,
+				"shield_rotation": 3.0,
 				"shield_offset": Vector2(-3.0, -9.0),
-				"z_index": 4
+				"show_shield_front": true,
+				"show_shield_back": false,
+				"weapon_z": 6
 			}
 		"right":
 			return {
-				"shoulder": Vector2(2.0, -18.0),
-				"arm_degrees": 0.0,
+				"left_shoulder": Vector2(2.0, -18.0),
+				"right_shoulder": Vector2(3.0, -18.0),
+				"left_arm_z": 4,
+				"right_arm_z": 5,
 				"shield_socket": Vector2(0.0, 13.0),
-				"shield_degrees": 0.0,
+				"shield_rotation": 0.0,
 				"shield_offset": Vector2(-13.0, -9.0),
-				"z_index": 4
+				"show_shield_front": false,
+				"show_shield_back": true,
+				"weapon_z": 6
 			}
 		"up":
 			return {
-				"shoulder": Vector2(-8.0, -18.0),
-				"arm_degrees": 0.0,
+				"left_shoulder": Vector2(-8.0, -18.0),
+				"right_shoulder": Vector2(8.0, -18.0),
+				"left_arm_z": 3,
+				"right_arm_z": 3,
 				"shield_socket": Vector2(0.0, 11.0),
-				"shield_degrees": -8.0,
+				"shield_rotation": -8.0,
 				"shield_offset": Vector2(-9.0, -9.0),
-				"z_index": 3
+				"show_shield_front": false,
+				"show_shield_back": true,
+				"weapon_z": 2
 			}
 		_:
 			return {
-				"shoulder": Vector2(10.0, -19.0),
-				"arm_degrees": 0.0,
+				"left_shoulder": Vector2(10.0, -19.0),
+				"right_shoulder": Vector2(-10.0, -19.0),
+				"left_arm_z": 5,
+				"right_arm_z": 5,
 				"shield_socket": Vector2(0.0, 14.0),
-				"shield_degrees": 0.0,
+				"shield_rotation": 0.0,
 				"shield_offset": Vector2(-5.0, -9.0),
-				"z_index": 5
+				"show_shield_front": true,
+				"show_shield_back": false,
+				"weapon_z": 6
 			}
 
 
-func _should_show_left_arm(direction_name: String, is_attacking: bool) -> bool:
-	if direction_name == "right":
-		return false
-	if direction_name == "left":
-		return not is_attacking
-	return true
+func _apply_pose_layer_defaults(pose: Dictionary, style: String, direction_name: String) -> Dictionary:
+	var layered_pose: Dictionary = pose.duplicate(true)
+	var has_left_grip: bool = layered_pose.get("left_hand_grip", null) is Vector2
+	var is_two_hand_style: bool = style in ["bow", "greatsword"]
+	var default_show_left: bool = has_left_grip
+	var default_show_right: bool = true
+	var defaults := {}
+
+	match direction_name:
+		"left":
+			defaults = {
+				"weapon_z": 5,
+				"left_arm_z": 3,
+				"right_arm_z": 5,
+				"show_left_arm": default_show_left,
+				"show_right_arm": default_show_right
+			}
+		"right":
+			defaults = {
+				"weapon_z": 6,
+				"left_arm_z": 3,
+				"right_arm_z": 6,
+				"show_left_arm": default_show_left,
+				"show_right_arm": default_show_right
+			}
+		"up":
+			defaults = {
+				"weapon_z": 1,
+				"left_arm_z": 1,
+				"right_arm_z": 1,
+				"show_left_arm": is_two_hand_style and has_left_grip,
+				"show_right_arm": is_two_hand_style
+			}
+		_:
+			defaults = {
+				"weapon_z": 6,
+				"left_arm_z": 6,
+				"right_arm_z": 6,
+				"show_left_arm": default_show_left or style in ["one_hand", "axe", "wand"],
+				"show_right_arm": default_show_right
+			}
+
+	for key in defaults.keys():
+		if not layered_pose.has(key):
+			layered_pose[key] = defaults[key]
+	return layered_pose
 
 
-func _should_show_front_shield(direction_name: String) -> bool:
-	return direction_name == "left" or direction_name == "down"
+func _get_one_hand_pose_set(direction_name: String) -> Dictionary:
+	match direction_name:
+		"left":
+			return {
+				"idle": _pose(Vector2(-1.0, -6.0), 122.0, Vector2(4.0, 6.0), null, {"weapon_z": 1, "right_arm_z": 1}),
+				"windup": _pose(Vector2(-3.0, -9.0), 216.0, Vector2(4.0, 6.0), null, {"weapon_z": 1, "right_arm_z": 1}),
+				"strike": _pose(Vector2(2.0, -3.0), 72.0, Vector2(4.0, 6.0)),
+				"recover": _pose(Vector2(-1.0, -5.0), 110.0, Vector2(4.0, 6.0), null, {"weapon_z": 1, "right_arm_z": 1})
+			}
+		"right":
+			return {
+				"idle": _pose(Vector2(6.0, -4.0), 58.0, Vector2(4.0, 6.0)),
+				"windup": _pose(Vector2(8.0, -7.0), -36.0, Vector2(4.0, 6.0)),
+				"strike": _pose(Vector2(10.0, -1.0), 108.0, Vector2(4.0, 6.0)),
+				"recover": _pose(Vector2(6.0, -3.0), 68.0, Vector2(4.0, 6.0))
+			}
+		"up":
+			return {
+				"idle": _pose(Vector2(13.0, -3.0), -18.0, Vector2(4.0, 6.0), null, {"weapon_z": 0, "right_arm_z": 1}),
+				"windup": _pose(Vector2(15.0, -5.0), -48.0, Vector2(4.0, 6.0), null, {"weapon_z": 0, "right_arm_z": 1}),
+				"strike": _pose(Vector2(11.0, -2.0), 12.0, Vector2(4.0, 6.0), null, {"weapon_z": 0, "right_arm_z": 1}),
+				"recover": _pose(Vector2(13.0, -3.0), -4.0, Vector2(4.0, 6.0), null, {"weapon_z": 0, "right_arm_z": 1})
+			}
+		_:
+			return {
+				"idle": _pose(Vector2(-12.0, -3.0), 170.0, Vector2(4.0, 6.0)),
+				"windup": _pose(Vector2(-13.0, -5.0), 206.0, Vector2(4.0, 6.0)),
+				"strike": _pose(Vector2(-11.0, 1.0), 154.0, Vector2(4.0, 6.0)),
+				"recover": _pose(Vector2(-12.0, -2.0), 170.0, Vector2(4.0, 6.0))
+			}
 
 
-func _should_show_back_shield(direction_name: String) -> bool:
-	return direction_name == "right" or direction_name == "up"
+func _get_axe_pose_set(direction_name: String) -> Dictionary:
+	return _get_one_hand_pose_set(direction_name)
+
+
+func _get_wand_pose_set(direction_name: String) -> Dictionary:
+	return _get_one_hand_pose_set(direction_name)
+
+
+func _get_bow_pose_set(direction_name: String) -> Dictionary:
+	match direction_name:
+		"left":
+			return {
+				"idle": _pose(Vector2(1.0, -8.0), 180.0, Vector2(8.0, 14.0), Vector2(8.0, 24.0)),
+				"windup": _pose(Vector2(0.0, -8.0), 180.0, Vector2(2.0, 14.0), Vector2(8.0, 24.0)),
+				"strike": _pose(Vector2(0.0, -8.0), 180.0, Vector2(0.0, 14.0), Vector2(8.0, 24.0)),
+				"recover": _pose(Vector2(1.0, -8.0), 180.0, Vector2(4.0, 14.0), Vector2(8.0, 24.0))
+			}
+		"right":
+			return {
+				"idle": _pose(Vector2(-1.0, -8.0), 0.0, Vector2(8.0, 14.0), Vector2(8.0, 24.0)),
+				"windup": _pose(Vector2(0.0, -8.0), 0.0, Vector2(14.0, 14.0), Vector2(8.0, 24.0)),
+				"strike": _pose(Vector2(0.0, -8.0), 0.0, Vector2(16.0, 14.0), Vector2(8.0, 24.0)),
+				"recover": _pose(Vector2(-1.0, -8.0), 0.0, Vector2(12.0, 14.0), Vector2(8.0, 24.0))
+			}
+		"up":
+			return {
+				"idle": _pose(Vector2(0.0, -10.0), -90.0, Vector2(8.0, 12.0), Vector2(8.0, 22.0)),
+				"windup": _pose(Vector2(0.0, -10.0), -90.0, Vector2(2.0, 12.0), Vector2(8.0, 22.0)),
+				"strike": _pose(Vector2(0.0, -10.0), -90.0, Vector2(0.0, 12.0), Vector2(8.0, 22.0)),
+				"recover": _pose(Vector2(0.0, -10.0), -90.0, Vector2(4.0, 12.0), Vector2(8.0, 22.0))
+			}
+		_:
+			return {
+				"idle": _pose(Vector2(0.0, -5.0), 8.0, Vector2(8.0, 12.0), Vector2(8.0, 22.0)),
+				"windup": _pose(Vector2(0.0, -5.0), 74.0, Vector2(14.0, 12.0), Vector2(8.0, 22.0)),
+				"strike": _pose(Vector2(0.0, -5.0), 88.0, Vector2(16.0, 12.0), Vector2(8.0, 22.0)),
+				"recover": _pose(Vector2(0.0, -5.0), 28.0, Vector2(12.0, 12.0), Vector2(8.0, 22.0))
+			}
+
+
+func _get_staff_pose_set(direction_name: String) -> Dictionary:
+	match direction_name:
+		"left":
+			return {
+				"idle": _pose(Vector2(-13.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"windup": _pose(Vector2(-15.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"strike": _pose(Vector2(-18.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"recover": _pose(Vector2(-13.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6})
+			}
+		"right":
+			return {
+				"idle": _pose(Vector2(18.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"windup": _pose(Vector2(20.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"strike": _pose(Vector2(23.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"recover": _pose(Vector2(18.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6})
+			}
+		"up":
+			return {
+				"idle": _pose(Vector2(22.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 1, "right_arm_z": 1, "show_right_arm": true}),
+				"windup": _pose(Vector2(24.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 1, "right_arm_z": 1, "show_right_arm": true}),
+				"strike": _pose(Vector2(27.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 1, "right_arm_z": 1, "show_right_arm": true}),
+				"recover": _pose(Vector2(22.0, -18.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 1, "right_arm_z": 1, "show_right_arm": true})
+			}
+		_:
+			return {
+				"idle": _pose(Vector2(-24.0, -19.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"windup": _pose(Vector2(-26.0, -19.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"strike": _pose(Vector2(-29.0, -19.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6}),
+				"recover": _pose(Vector2(-24.0, -19.0), 90.0, Vector2(6.0, 42.0), null, {"weapon_z": 6, "right_arm_z": 6})
+			}
+
+
+func _get_greatsword_pose_set(direction_name: String) -> Dictionary:
+	match direction_name:
+		"left":
+			return {
+				"idle": _pose(Vector2(3.0, -10.0), 164.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"windup": _pose(Vector2(6.0, -12.0), 236.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"strike": _pose(Vector2(-2.0, -7.0), 94.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"recover": _pose(Vector2(1.0, -9.0), 142.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0))
+			}
+		"right":
+			return {
+				"idle": _pose(Vector2(-3.0, -10.0), 16.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"windup": _pose(Vector2(-6.0, -12.0), -56.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"strike": _pose(Vector2(2.0, -7.0), 86.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"recover": _pose(Vector2(-1.0, -9.0), 38.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0))
+			}
+		"up":
+			return {
+				"idle": _pose(Vector2(0.0, -12.0), -14.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"windup": _pose(Vector2(2.0, -14.0), -64.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"strike": _pose(Vector2(-1.0, -9.0), 10.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"recover": _pose(Vector2(0.0, -11.0), -18.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0))
+			}
+		_:
+			return {
+				"idle": _pose(Vector2(0.0, -2.0), 186.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"windup": _pose(Vector2(0.0, -5.0), 252.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"strike": _pose(Vector2(0.0, 1.0), 138.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
+				"recover": _pose(Vector2(0.0, -1.0), 174.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0))
+			}
+
+
+func _free_hand_target(direction_name: String, side: String) -> Vector2:
+	match direction_name:
+		"left":
+			return Vector2(-2.0, -2.0) if side == "left" else Vector2(8.0, -2.0)
+		"right":
+			return Vector2(2.0, -2.0) if side == "left" else Vector2(-8.0, -2.0)
+		"up":
+			return Vector2(-5.0, -4.0) if side == "left" else Vector2(5.0, -4.0)
+		_:
+			return Vector2(7.0, 0.0) if side == "left" else Vector2(-7.0, 0.0)
+
+
+func _relaxed_offhand_target(direction_name: String) -> Vector2:
+	match direction_name:
+		"left":
+			return Vector2(-5.0, -2.0)
+		"right":
+			return Vector2(4.0, -1.0)
+		"up":
+			return Vector2(-8.0, -6.0)
+		_:
+			return Vector2(10.0, -2.0)
+
+
+func _uses_one_hand_shield_stance(style: String) -> bool:
+	return style in ["one_hand", "axe", "wand", "staff"]
+
+
+func _get_shield_socket_position(direction_rig: Dictionary, direction_name: String, relaxed_shield: bool) -> Vector2:
+	if not relaxed_shield:
+		return direction_rig.get("shield_socket", Vector2(0.0, 14.0)) as Vector2
+	match direction_name:
+		"left", "right":
+			return Vector2(0.0, 13.0)
+		_:
+			return Vector2(0.0, 10.0)
+
+
+func _get_shield_rotation(direction_rig: Dictionary, direction_name: String, relaxed_shield: bool) -> float:
+	if not relaxed_shield:
+		return float(direction_rig.get("shield_rotation", 0.0))
+	match direction_name:
+		"left":
+			return -8.0
+		"right":
+			return 8.0
+		_:
+			return 0.0
+
+
+func _get_shield_offset(direction_rig: Dictionary, direction_name: String, relaxed_shield: bool) -> Vector2:
+	if not relaxed_shield:
+		return direction_rig.get("shield_offset", Vector2(-7.0, -8.0)) as Vector2
+	match direction_name:
+		"left":
+			return Vector2(-3.0, -8.0)
+		"right":
+			return Vector2(-6.0, -8.0)
+		_:
+			return Vector2(-4.0, -8.0)
+
+
+func _pose(position: Vector2, rotation_degrees: float, right_hand_grip: Vector2, left_hand_grip: Variant = null, extras: Dictionary = {}) -> Dictionary:
+	var pose := {
+		"weapon_position": position,
+		"weapon_rotation": rotation_degrees,
+		"right_hand_grip": right_hand_grip,
+		"left_hand_grip": left_hand_grip
+	}
+	for key in extras.keys():
+		pose[key] = extras[key]
+	return pose
+
+
+func _blend_pose_dicts(from_pose_variant: Variant, to_pose_variant: Variant, weight: float) -> Dictionary:
+	var from_pose: Dictionary = (from_pose_variant as Dictionary).duplicate(true)
+	var to_pose: Dictionary = (to_pose_variant as Dictionary).duplicate(true)
+	var result: Dictionary = from_pose.duplicate(true)
+	for key in to_pose.keys():
+		if not result.has(key):
+			result[key] = to_pose[key]
+			continue
+		if result[key] is Vector2 and to_pose[key] is Vector2:
+			result[key] = (result[key] as Vector2).lerp(to_pose[key] as Vector2, weight)
+		elif result[key] is float or result[key] is int:
+			result[key] = lerpf(float(result[key]), float(to_pose[key]), weight)
+		else:
+			result[key] = to_pose[key] if weight >= 0.5 else result[key]
+	return result
+
+
+func _weapon_local_to_player(weapon_position: Vector2, weapon_rotation_degrees: float, local_point: Vector2, grip_offset: Vector2) -> Vector2:
+	return weapon_position + (grip_offset + local_point).rotated(deg_to_rad(weapon_rotation_degrees))
+
+
+func _apply_arm_pose(arm_pivot: Node2D, arm_sprite_node: Sprite2D, shoulder_position: Vector2, target_position: Vector2, should_show: bool, z_index: int) -> void:
+	arm_pivot.position = shoulder_position
+	arm_pivot.z_index = z_index
+	arm_pivot.visible = should_show
+	arm_sprite_node.visible = should_show
+	if not should_show:
+		arm_sprite_node.scale = Vector2.ONE
+		return
+	var vector_to_target: Vector2 = target_position - shoulder_position
+	if vector_to_target.length() < 0.01:
+		vector_to_target = Vector2.DOWN * ARM_REACH
+	arm_pivot.rotation = Vector2.DOWN.angle_to(vector_to_target)
+	arm_sprite_node.scale = Vector2(1.0, clampf(vector_to_target.length() / ARM_REACH, 0.85, 1.45))
 
 
 func _get_back_shield_pose(direction_name: String) -> Dictionary:
@@ -484,44 +916,38 @@ func _get_back_shield_pose(direction_name: String) -> Dictionary:
 			}
 
 
-func _get_shield_texture(direction_name: String) -> Texture2D:
-	return shield_textures.get("Oak Buckler", null)
-
-
-func _should_show_right_arm(direction_name: String, is_attacking: bool) -> bool:
-	if direction_name == "left":
-		return is_attacking
-	if direction_name == "right":
-		return true
-	return true
-
-
-func _should_show_right_weapon(direction_name: String, _is_attacking: bool) -> bool:
-	if direction_name == "left":
-		return true
-	return _should_show_right_arm(direction_name, _is_attacking)
-
-
 func _smooth_attack_phase(phase: float) -> float:
 	return phase * phase * (3.0 - 2.0 * phase)
 
 
+func _get_current_attack_profile() -> Dictionary:
+	if equipped_weapon_name.is_empty():
+		return InventoryStateScript.DEFAULT_WEAPON_DATA.duplicate(true)
+	return InventoryStateScript.get_weapon_data(equipped_weapon_name)
+
+
 func _get_weapon_visual_profile(weapon_name: String) -> Dictionary:
+	var profile: Dictionary = InventoryStateScript.get_weapon_data(weapon_name)
 	match weapon_name:
-		"Traveler Knife":
-			return {
-				"type": "short_blade",
-				"socket": Vector2(0.0, 17.0),
-				"rotation_degrees": 0.0,
-				"flip_h": false
-			}
+		"Hunter Bow":
+			profile["offset"] = Vector2(-6.0, -17.0)
+			profile["rotation_offsets"] = {"default": 0.0}
+		"Ash Staff":
+			profile["offset"] = Vector2(-6.0, -42.0)
+			profile["rotation_offsets"] = {"default": 0.0}
+		"Willow Wand":
+			profile["offset"] = Vector2(-3.0, -7.0)
+			profile["rotation_offsets"] = {"default": 0.0}
+		"Iron Greatsword":
+			profile["offset"] = Vector2(-6.0, -17.0)
+			profile["rotation_offsets"] = {"default": 0.0}
+		"Woodsman Axe":
+			profile["offset"] = Vector2(-3.0, -7.0)
+			profile["rotation_offsets"] = {"default": 0.0}
 		_:
-			return {
-				"type": "short_blade",
-				"socket": Vector2(0.0, 17.0),
-				"rotation_degrees": 0.0,
-				"flip_h": false
-			}
+			profile["offset"] = Vector2(-3.0, -7.0)
+			profile["rotation_offsets"] = {"default": 0.0}
+	return profile
 
 
 func _update_attack_arm_texture() -> void:
@@ -549,6 +975,80 @@ func _create_knife_texture() -> Texture2D:
 	image.fill_rect(Rect2i(9, 4, 7, 1), steel_light)
 	image.fill_rect(Rect2i(10, 5, 6, 1), steel_dark)
 	image.fill_rect(Rect2i(16, 4, 2, 1), steel_light)
+	return ImageTexture.create_from_image(image)
+
+
+func _create_bow_texture() -> Texture2D:
+	var image: Image = Image.create(16, 30, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	var outline: Color = Color(0.04, 0.03, 0.025, 1.0)
+	var wood: Color = Color(0.44, 0.25, 0.12, 1.0)
+	var string_color: Color = Color(0.82, 0.78, 0.68, 1.0)
+	image.fill_rect(Rect2i(4, 2, 2, 26), outline)
+	image.fill_rect(Rect2i(10, 2, 2, 26), outline)
+	image.fill_rect(Rect2i(5, 3, 1, 24), wood)
+	image.fill_rect(Rect2i(10, 3, 1, 24), wood)
+	image.fill_rect(Rect2i(6, 2, 5, 1), outline)
+	image.fill_rect(Rect2i(6, 27, 5, 1), outline)
+	for y in range(4, 26):
+		image.set_pixel(8, y, string_color)
+	return ImageTexture.create_from_image(image)
+
+
+func _create_staff_texture() -> Texture2D:
+	var image: Image = Image.create(12, 48, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	var outline: Color = Color(0.04, 0.03, 0.025, 1.0)
+	var wood: Color = Color(0.43, 0.25, 0.12, 1.0)
+	var ember: Color = Color(0.88, 0.47, 0.16, 1.0)
+	image.fill_rect(Rect2i(4, 5, 4, 40), outline)
+	image.fill_rect(Rect2i(5, 6, 2, 38), wood)
+	image.fill_rect(Rect2i(2, 0, 8, 8), outline)
+	image.fill_rect(Rect2i(3, 1, 6, 6), ember)
+	return ImageTexture.create_from_image(image)
+
+
+func _create_wand_texture() -> Texture2D:
+	var image: Image = Image.create(20, 10, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	var outline: Color = Color(0.04, 0.03, 0.025, 1.0)
+	var wood: Color = Color(0.41, 0.25, 0.12, 1.0)
+	var crystal: Color = Color(0.48, 0.78, 0.96, 1.0)
+	image.fill_rect(Rect2i(1, 4, 13, 3), outline)
+	image.fill_rect(Rect2i(2, 5, 11, 1), wood)
+	image.fill_rect(Rect2i(13, 3, 6, 5), outline)
+	image.fill_rect(Rect2i(14, 4, 4, 3), crystal)
+	return ImageTexture.create_from_image(image)
+
+
+func _create_greatsword_texture() -> Texture2D:
+	var image: Image = Image.create(14, 38, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	var outline: Color = Color(0.04, 0.03, 0.025, 1.0)
+	var steel_dark: Color = Color(0.46, 0.47, 0.50, 1.0)
+	var steel: Color = Color(0.79, 0.83, 0.80, 1.0)
+	var leather: Color = Color(0.25, 0.15, 0.08, 1.0)
+	image.fill_rect(Rect2i(4, 0, 6, 22), outline)
+	image.fill_rect(Rect2i(5, 1, 4, 20), steel_dark)
+	image.fill_rect(Rect2i(6, 1, 2, 18), steel)
+	image.fill_rect(Rect2i(2, 22, 10, 3), outline)
+	image.fill_rect(Rect2i(3, 23, 8, 1), steel_dark)
+	image.fill_rect(Rect2i(5, 25, 4, 10), outline)
+	image.fill_rect(Rect2i(6, 26, 2, 8), leather)
+	return ImageTexture.create_from_image(image)
+
+
+func _create_axe_texture() -> Texture2D:
+	var image: Image = Image.create(24, 14, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	var outline: Color = Color(0.04, 0.03, 0.025, 1.0)
+	var wood: Color = Color(0.43, 0.25, 0.12, 1.0)
+	var steel: Color = Color(0.74, 0.78, 0.80, 1.0)
+	image.fill_rect(Rect2i(1, 6, 15, 3), outline)
+	image.fill_rect(Rect2i(2, 7, 13, 1), wood)
+	image.fill_rect(Rect2i(14, 2, 8, 10), outline)
+	image.fill_rect(Rect2i(15, 3, 5, 8), steel)
+	image.fill_rect(Rect2i(20, 5, 2, 4), steel)
 	return ImageTexture.create_from_image(image)
 
 
