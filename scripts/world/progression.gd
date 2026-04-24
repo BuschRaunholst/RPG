@@ -1,48 +1,5 @@
 extends RefCounted
 
-const STAT_KEYS := ["strength", "stamina", "dexterity"]
-const STARTING_STAT_POINTS := 3
-const POINTS_PER_LEVEL := 2
-
-
-static func normalize_allocations(raw_value: Variant) -> Dictionary:
-	var allocations := {
-		"strength": 1,
-		"stamina": 1,
-		"dexterity": 1
-	}
-
-	if typeof(raw_value) != TYPE_DICTIONARY:
-		return allocations
-
-	var raw_dict: Dictionary = raw_value
-	for stat_key in STAT_KEYS:
-		allocations[stat_key] = maxi(0, int(raw_dict.get(stat_key, allocations[stat_key])))
-
-	return allocations
-
-
-static func increase_stat(allocations: Dictionary, stat_name: String) -> Dictionary:
-	var next_allocations: Dictionary = normalize_allocations(allocations)
-	if not STAT_KEYS.has(stat_name):
-		return next_allocations
-
-	next_allocations[stat_name] = int(next_allocations.get(stat_name, 0)) + 1
-	return next_allocations
-
-
-static func get_points_earned_for_level(level: int) -> int:
-	return STARTING_STAT_POINTS + maxi(0, level - 1) * POINTS_PER_LEVEL
-
-
-static func get_spent_points(allocations: Dictionary) -> int:
-	var normalized_allocations: Dictionary = normalize_allocations(allocations)
-	var spent_points: int = 0
-	for stat_key in STAT_KEYS:
-		spent_points += int(normalized_allocations.get(stat_key, 0))
-	return spent_points
-
-
 static func get_level_for_xp(total_xp: int) -> int:
 	var level: int = 1
 	while total_xp >= get_total_xp_for_level(level + 1):
@@ -65,35 +22,47 @@ static func get_xp_to_next_level(level: int) -> int:
 	return 10 + (level_index * 8) + (level_index * level_index * 3)
 
 
-static func get_progression_state(total_xp: int, allocations: Dictionary) -> Dictionary:
+static func get_level_skill_points_earned(level: int) -> int:
+	return maxi(0, level - 1)
+
+
+static func normalize_claimed_milestones(raw_value: Variant) -> Array[String]:
+	var claimed: Array[String] = []
+	if typeof(raw_value) != TYPE_ARRAY:
+		return claimed
+	for milestone_variant in raw_value:
+		var milestone_id: String = str(milestone_variant)
+		if milestone_id.is_empty() or claimed.has(milestone_id):
+			continue
+		claimed.append(milestone_id)
+	return claimed
+
+
+static func get_milestone_skill_points_earned(raw_claimed_milestones: Variant) -> int:
+	return 0
+
+
+static func get_total_skill_points_earned(total_xp: int, raw_claimed_milestones: Variant) -> int:
+	var level: int = get_level_for_xp(total_xp)
+	return get_level_skill_points_earned(level) + get_milestone_skill_points_earned(raw_claimed_milestones)
+
+
+static func get_progression_state(total_xp: int, raw_claimed_milestones: Variant = []) -> Dictionary:
 	var level: int = get_level_for_xp(total_xp)
 	var level_start_xp: int = get_total_xp_for_level(level)
 	var xp_to_next: int = get_xp_to_next_level(level)
 	var xp_into_level: int = total_xp - level_start_xp
-	var normalized_allocations: Dictionary = normalize_allocations(allocations)
-	var earned_points: int = get_points_earned_for_level(level)
-	var spent_points: int = get_spent_points(normalized_allocations)
-	var unspent_points: int = maxi(0, earned_points - spent_points)
+	var claimed_milestones: Array[String] = normalize_claimed_milestones(raw_claimed_milestones)
+	var level_points: int = get_level_skill_points_earned(level)
+	var milestone_points: int = claimed_milestones.size()
 
 	return {
 		"level": level,
 		"xp_total": total_xp,
 		"xp_into_level": xp_into_level,
 		"xp_to_next": xp_to_next,
-		"allocations": normalized_allocations,
-		"unspent_points": unspent_points
-	}
-
-
-static func get_stat_bonuses(allocations: Dictionary) -> Dictionary:
-	var normalized_allocations: Dictionary = normalize_allocations(allocations)
-	var strength_value: int = int(normalized_allocations.get("strength", 0))
-	var stamina_value: int = int(normalized_allocations.get("stamina", 0))
-	var dexterity_value: int = int(normalized_allocations.get("dexterity", 0))
-
-	return {
-		"attack": strength_value * 4,
-		"max_health": stamina_value * 18,
-		"defense": dexterity_value * 3,
-		"move_speed": dexterity_value * 4
+		"level_skill_points": level_points,
+		"milestone_skill_points": milestone_points,
+		"total_skill_points": level_points + milestone_points,
+		"claimed_milestones": claimed_milestones
 	}

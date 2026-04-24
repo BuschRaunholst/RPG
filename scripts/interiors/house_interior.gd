@@ -2,7 +2,10 @@ extends Node2D
 
 const InventoryStateScript = preload("res://scripts/world/inventory_state.gd")
 const InteractionControllerScript = preload("res://scripts/world/interaction_controller.gd")
+const ClassProgressionStateScript = preload("res://scripts/world/class_progression_state.gd")
 const ProgressionScript = preload("res://scripts/world/progression.gd")
+const SkillTreeResolverScript = preload("res://scripts/world/skill_tree_resolver.gd")
+const PlayerBuildRuntimeScript = preload("res://scripts/world/player_build_runtime.gd")
 const SaveManagerScript = preload("res://scripts/world/save_manager.gd")
 const BASE_PLAYER_MAX_HEALTH := 5
 const BASE_PLAYER_MOVE_SPEED := 180.0
@@ -22,13 +25,9 @@ var equipment_slots: Dictionary = InventoryStateScript.normalize_equipment(null)
 var player_health: int = 5
 var player_max_health: int = 5
 var player_xp: int = 0
-var player_level: int = 1
-var player_unspent_stat_points: int = 0
-var player_allocations := {
-	"strength": 1,
-	"stamina": 1,
-	"dexterity": 1
-}
+var progression_state: Dictionary = {}
+var resolved_progression: Dictionary = {}
+var runtime_build_state: Dictionary = {}
 var player_gold: int = 18
 var tracked_quest_ids: Array[String] = []
 var known_quest_entry_ids: Array[String] = []
@@ -43,7 +42,8 @@ func _ready() -> void:
 	GameSession.bind_overlay_inventory_changed(Callable(self, "_on_inventory_layout_changed"))
 	GameSession.bind_overlay_item_use_requested(Callable(self, "_on_inventory_item_use_requested"))
 	GameSession.bind_overlay_quick_item_assigned(Callable(self, "_on_quick_item_assigned"))
-	GameSession.bind_overlay_stat_increase_requested(Callable(self, "_on_stat_increase_requested"))
+	GameSession.bind_overlay_skill_node_unlock_requested(Callable(self, "_on_skill_node_unlock_requested"))
+	GameSession.bind_overlay_skill_family_equipped(Callable(self, "_on_skill_family_equipped"))
 	GameSession.bind_overlay_menu_toggled(Callable(self, "_on_menu_toggled"))
 	GameSession.bind_overlay_tracked_quest_changed(Callable(self, "_on_tracked_quest_changed"))
 	GameSession.set_overlay_header("Tap the door to head back outside", "Blue House")
@@ -247,7 +247,7 @@ func _apply_ui_state(save_data: Dictionary) -> void:
 	rowan_offer_state = str(save_data.get("rowan_offer_state", rowan_offer_state))
 	player_health = int(save_data.get("player_health", player_health))
 	player_xp = int(save_data.get("player_xp", player_xp))
-	player_allocations = ProgressionScript.normalize_allocations(save_data.get("player_allocations", player_allocations))
+	progression_state = ClassProgressionStateScript.normalize_state(save_data.get("progression_state", {}), player_xp)
 	player_gold = int(save_data.get("player_gold", player_gold))
 	tracked_quest_ids = GameSession.normalize_tracked_quest_array(save_data.get("tracked_quest_ids", save_data.get("tracked_quest_id", tracked_quest_ids)))
 	known_quest_entry_ids = GameSession.normalize_tracked_quest_array(save_data.get("known_quest_entry_ids", known_quest_entry_ids))
@@ -283,29 +283,28 @@ func _update_inventory_log() -> void:
 		quick_item_kind = "consumable"
 
 	GameSession.set_overlay_inventory_state(inventory_slots, equipment_slots, player_gold)
-	var equipment_totals: Dictionary = InventoryStateScript.get_equipment_totals(equipment_slots)
-	var stat_bonuses: Dictionary = ProgressionScript.get_stat_bonuses(player_allocations)
 	GameSession.set_overlay_progression_state(
-		player_level,
-		player_unspent_stat_points,
-		player_allocations,
-		1 + int(equipment_totals.get("attack", 0)) + int(stat_bonuses.get("attack", 0)),
-		int(equipment_totals.get("defense", 0)) + int(stat_bonuses.get("defense", 0)),
+		int(runtime_build_state.get("level", 1)),
+		int(runtime_build_state.get("available_skill_points", 0)),
+		runtime_build_state.get("overlay_allocations", {}),
+		int(runtime_build_state.get("attack", 1)),
+		int(runtime_build_state.get("defense", 0)),
 		player_max_health
 	)
+	GameSession.set_overlay_skills_state(progression_state, resolved_progression)
 	_update_quick_item_button()
 
 
 func _refresh_status_panel() -> void:
-	var progression_state: Dictionary = ProgressionScript.get_progression_state(player_xp, player_allocations)
+	var progression_info: Dictionary = runtime_build_state.get("progression_info", {})
 	GameSession.set_overlay_status(
 		player_health,
 		player_max_health,
-		int(progression_state.get("xp_into_level", 0)),
+		int(progression_info.get("xp_into_level", 0)),
 		"Safe indoors.",
 		player_health <= 1,
-		int(progression_state.get("xp_to_next", 10)),
-		player_level
+		int(progression_info.get("xp_to_next", 10)),
+		int(runtime_build_state.get("level", 1))
 	)
 
 
@@ -319,7 +318,7 @@ func _build_scene_state(current_scene_path: String) -> Dictionary:
 	}
 	save_data["player_health"] = player_health
 	save_data["player_xp"] = player_xp
-	save_data["player_allocations"] = player_allocations.duplicate(true)
+	save_data["progression_state"] = progression_state.duplicate(true)
 	save_data["player_gold"] = player_gold
 	save_data["tracked_quest_ids"] = tracked_quest_ids.duplicate()
 	save_data["known_quest_entry_ids"] = known_quest_entry_ids.duplicate()
@@ -344,16 +343,20 @@ func _on_inventory_layout_changed(next_bag_slots: Array, next_equipment_slots: D
 	_autosave("Autosaved gear")
 
 
-func _on_stat_increase_requested(stat_name: String) -> void:
-	if player_unspent_stat_points <= 0:
-		_update_save_status("No stat points available")
-		return
-
-	player_allocations = ProgressionScript.increase_stat(player_allocations, stat_name)
+func _on_skill_node_unlock_requested(node_id: String) -> void:
+	progression_state = ClassProgressionStateScript.unlock_node(progression_state, node_id, player_xp)
 	_recalculate_player_stats()
 	_update_inventory_log()
 	_refresh_status_panel()
-	_autosave("Autosaved stats")
+	_autosave("Autosaved skills")
+
+
+func _on_skill_family_equipped(skill_family: String, slot_index: int) -> void:
+	progression_state = ClassProgressionStateScript.equip_skill_family(progression_state, skill_family, slot_index, player_xp)
+	_recalculate_player_stats()
+	_update_inventory_log()
+	_refresh_status_panel()
+	_autosave("Autosaved skills")
 
 
 func _on_inventory_item_use_requested(item_name: String) -> void:
@@ -403,15 +406,13 @@ func _on_tracked_quest_changed(quest_id: String) -> void:
 
 
 func _recalculate_player_stats() -> void:
-	var progression_state: Dictionary = ProgressionScript.get_progression_state(player_xp, player_allocations)
-	var stat_totals: Dictionary = InventoryStateScript.get_equipment_totals(equipment_slots)
-	var stat_bonuses: Dictionary = ProgressionScript.get_stat_bonuses(progression_state.get("allocations", {}))
-	player_level = int(progression_state.get("level", 1))
-	player_unspent_stat_points = int(progression_state.get("unspent_points", 0))
-	player_allocations = ProgressionScript.normalize_allocations(progression_state.get("allocations", {}))
-	player_max_health = BASE_PLAYER_MAX_HEALTH + int(stat_totals.get("max_health", 0)) + int(stat_bonuses.get("max_health", 0))
-	player_health = clampi(player_health, 0, player_max_health)
-	player.set("move_speed", BASE_PLAYER_MOVE_SPEED + float(stat_bonuses.get("move_speed", 0)))
+	var old_max_health: int = player_max_health
+	runtime_build_state = PlayerBuildRuntimeScript.build_state(player_xp, progression_state, equipment_slots, BASE_PLAYER_MAX_HEALTH, BASE_PLAYER_MOVE_SPEED)
+	progression_state = runtime_build_state.get("progression_state", {})
+	resolved_progression = runtime_build_state.get("resolved_progression", {})
+	player_max_health = int(runtime_build_state.get("max_health", BASE_PLAYER_MAX_HEALTH))
+	player_health = PlayerBuildRuntimeScript.adjust_health_for_max_change(player_health, old_max_health, player_max_health, false)
+	PlayerBuildRuntimeScript.apply_to_player(player, runtime_build_state)
 
 
 func _use_consumable_item(item_name: String, from_menu: bool) -> void:
@@ -509,15 +510,15 @@ func _autosave(status_message: String) -> void:
 
 
 func _set_status_message(message: String) -> void:
-	var progression_state: Dictionary = ProgressionScript.get_progression_state(player_xp, player_allocations)
+	var progression_info: Dictionary = runtime_build_state.get("progression_info", {})
 	GameSession.set_overlay_status(
 		player_health,
 		player_max_health,
-		int(progression_state.get("xp_into_level", 0)),
+		int(progression_info.get("xp_into_level", 0)),
 		message,
 		player_health <= 1,
-		int(progression_state.get("xp_to_next", 10)),
-		player_level
+		int(progression_info.get("xp_to_next", 10)),
+		int(runtime_build_state.get("level", 1))
 	)
 
 

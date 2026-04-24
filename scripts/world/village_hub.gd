@@ -1,7 +1,10 @@
 extends Node2D
 
 const InventoryStateScript = preload("res://scripts/world/inventory_state.gd")
+const ClassProgressionStateScript = preload("res://scripts/world/class_progression_state.gd")
 const ProgressionScript = preload("res://scripts/world/progression.gd")
+const SkillTreeResolverScript = preload("res://scripts/world/skill_tree_resolver.gd")
+const PlayerBuildRuntimeScript = preload("res://scripts/world/player_build_runtime.gd")
 const PlayerScene = preload("res://scenes/actors/player.tscn")
 const NpcScene = preload("res://scenes/actors/npc.tscn")
 const EntranceScene = preload("res://scenes/interactables/dungeon_entrance.tscn")
@@ -23,7 +26,9 @@ var player_health: int = BASE_PLAYER_HEALTH
 var player_max_health: int = BASE_PLAYER_HEALTH
 var player_xp: int = 0
 var player_gold: int = 0
-var stat_allocations: Dictionary = {"strength": 1, "stamina": 1, "dexterity": 1}
+var progression_state: Dictionary = {}
+var resolved_progression: Dictionary = {}
+var runtime_build_state: Dictionary = {}
 var bag_slots: Array[Dictionary] = []
 var equipment_slots: Dictionary = {}
 var quick_item_name: String = ""
@@ -55,19 +60,23 @@ func _process(delta: float) -> void:
 func _setup_state() -> void:
 	var transition_state: Dictionary = GameSession.consume_transition_state()
 	if transition_state.is_empty():
-		var starting_state: Dictionary = InventoryStateScript.create_default_starting_state()
+		progression_state = ClassProgressionStateScript.create_new_state(ClassProgressionStateScript.DEFAULT_CLASS_ID)
+		var starting_state: Dictionary = InventoryStateScript.create_default_starting_state_for_class(str(progression_state.get("class_id", ClassProgressionStateScript.DEFAULT_CLASS_ID)))
 		bag_slots = InventoryStateScript.normalize_bag(starting_state.get("bag_slots", []))
 		equipment_slots = InventoryStateScript.normalize_equipment(starting_state.get("equipment_slots", {}))
+		progression_state = ClassProgressionStateScript.sync_state(progression_state, player_xp)
+		_refresh_resolved_progression()
 		return
 
 	bag_slots = InventoryStateScript.normalize_bag(transition_state.get("bag_slots", []))
 	equipment_slots = InventoryStateScript.normalize_equipment(transition_state.get("equipment_slots", {}))
-	stat_allocations = ProgressionScript.normalize_allocations(transition_state.get("stat_allocations", {}))
 	player_xp = int(transition_state.get("player_xp", 0))
 	player_gold = int(transition_state.get("player_gold", 0))
 	player_max_health = int(transition_state.get("player_max_health", BASE_PLAYER_HEALTH))
 	player_health = clampi(int(transition_state.get("player_health", player_max_health)), 1, player_max_health)
 	quick_item_name = str(transition_state.get("quick_item_name", ""))
+	progression_state = ClassProgressionStateScript.normalize_state(transition_state.get("progression_state", {}), player_xp)
+	_refresh_resolved_progression()
 
 
 func _bind_overlay() -> void:
@@ -77,7 +86,8 @@ func _bind_overlay() -> void:
 	GameSession.bind_overlay_inventory_changed(Callable(self, "_on_inventory_changed"))
 	GameSession.bind_overlay_item_use_requested(Callable(self, "_on_item_use_requested"))
 	GameSession.bind_overlay_quick_item_assigned(Callable(self, "_on_quick_item_assigned"))
-	GameSession.bind_overlay_stat_increase_requested(Callable(self, "_on_stat_increase_requested"))
+	GameSession.bind_overlay_skill_node_unlock_requested(Callable(self, "_on_skill_node_unlock_requested"))
+	GameSession.bind_overlay_skill_family_equipped(Callable(self, "_on_skill_family_equipped"))
 
 
 func _create_roots() -> void:
@@ -324,7 +334,7 @@ func _enter_dungeon() -> void:
 		"player_max_health": player_max_health,
 		"player_xp": player_xp,
 		"player_gold": player_gold,
-		"stat_allocations": stat_allocations,
+		"progression_state": progression_state,
 		"bag_slots": bag_slots,
 		"equipment_slots": equipment_slots,
 		"quick_item_name": quick_item_name
@@ -358,16 +368,6 @@ func _on_quick_item_assigned(item_name: String, _item_kind: String) -> void:
 	_update_context_button()
 
 
-func _on_stat_increase_requested(stat_name: String) -> void:
-	var progression_state: Dictionary = ProgressionScript.get_progression_state(player_xp, stat_allocations)
-	if int(progression_state.get("unspent_points", 0)) <= 0:
-		return
-	stat_allocations = ProgressionScript.increase_stat(stat_allocations, stat_name)
-	_apply_stats()
-	status_message = "Raised %s." % stat_name.capitalize()
-	_update_overlay()
-
-
 func _on_overlay_menu_toggled(is_open: bool) -> void:
 	get_tree().paused = is_open
 	if player != null and player.has_method("set_can_move"):
@@ -399,39 +399,33 @@ func _use_item(item_name: String) -> void:
 
 func _apply_stats() -> void:
 	var old_max_health: int = player_max_health
-	var stat_bonuses: Dictionary = ProgressionScript.get_stat_bonuses(stat_allocations)
-	var equipment_totals: Dictionary = InventoryStateScript.get_equipment_totals(equipment_slots)
-	player_max_health = BASE_PLAYER_HEALTH + int(stat_bonuses.get("max_health", 0)) + int(equipment_totals.get("max_health", 0))
-	if player_max_health != old_max_health:
-		player_health = clampi(player_health + player_max_health - old_max_health, 1, player_max_health)
-	if player != null:
-		player.set("move_speed", 165.0 + float(stat_bonuses.get("move_speed", 0)))
-		if player.has_method("set_equipment_visuals"):
-			player.call("set_equipment_visuals", equipment_slots)
+	runtime_build_state = PlayerBuildRuntimeScript.build_state(player_xp, progression_state, equipment_slots, BASE_PLAYER_HEALTH, 165.0)
+	progression_state = runtime_build_state.get("progression_state", {})
+	resolved_progression = runtime_build_state.get("resolved_progression", {})
+	player_max_health = int(runtime_build_state.get("max_health", BASE_PLAYER_HEALTH))
+	player_health = PlayerBuildRuntimeScript.adjust_health_for_max_change(player_health, old_max_health, player_max_health, true)
+	PlayerBuildRuntimeScript.apply_to_player(player, runtime_build_state)
 
 
 func _get_attack_value() -> int:
-	var stat_bonuses: Dictionary = ProgressionScript.get_stat_bonuses(stat_allocations)
-	var equipment_totals: Dictionary = InventoryStateScript.get_equipment_totals(equipment_slots)
-	return 1 + int(stat_bonuses.get("attack", 0)) + int(equipment_totals.get("attack", 0))
+	return int(runtime_build_state.get("attack", 1))
 
 
 func _get_defense_value() -> int:
-	var stat_bonuses: Dictionary = ProgressionScript.get_stat_bonuses(stat_allocations)
-	var equipment_totals: Dictionary = InventoryStateScript.get_equipment_totals(equipment_slots)
-	return int(stat_bonuses.get("defense", 0)) + int(equipment_totals.get("defense", 0))
+	return int(runtime_build_state.get("defense", 0))
 
 
 func _update_overlay() -> void:
 	_apply_stats()
-	var progression_state: Dictionary = ProgressionScript.get_progression_state(player_xp, stat_allocations)
-	var level_value: int = int(progression_state.get("level", 1))
-	var xp_into_level: int = int(progression_state.get("xp_into_level", 0))
-	var xp_to_next: int = int(progression_state.get("xp_to_next", 10))
+	var progression_info: Dictionary = runtime_build_state.get("progression_info", {})
+	var level_value: int = int(progression_info.get("level", 1))
+	var xp_into_level: int = int(progression_info.get("xp_into_level", 0))
+	var xp_to_next: int = int(progression_info.get("xp_to_next", 10))
 	GameSession.set_overlay_header("Village", "Ashenford")
 	GameSession.set_overlay_status(player_health, player_max_health, xp_into_level, status_message, player_health <= 2, xp_to_next, level_value)
 	GameSession.set_overlay_inventory_state(bag_slots, equipment_slots, player_gold)
-	GameSession.set_overlay_progression_state(level_value, int(progression_state.get("unspent_points", 0)), stat_allocations, _get_attack_value(), _get_defense_value(), player_max_health)
+	GameSession.set_overlay_progression_state(level_value, int(runtime_build_state.get("available_skill_points", 0)), runtime_build_state.get("overlay_allocations", {}), _get_attack_value(), _get_defense_value(), player_max_health)
+	GameSession.set_overlay_skills_state(progression_state, resolved_progression)
 	GameSession.set_overlay_quest_journal([
 		{
 			"id": "enter_dungeon",
@@ -458,6 +452,22 @@ func _update_context_button() -> void:
 		mobile_controls.call("set_context_action_label", label_text)
 	if mobile_controls.has_method("set_quick_item"):
 		mobile_controls.call("set_quick_item", quick_item_name, _get_bag_item_count(quick_item_name))
+
+
+func _refresh_resolved_progression() -> void:
+	runtime_build_state = PlayerBuildRuntimeScript.build_state(player_xp, progression_state, equipment_slots, BASE_PLAYER_HEALTH, 165.0)
+	progression_state = runtime_build_state.get("progression_state", {})
+	resolved_progression = runtime_build_state.get("resolved_progression", {})
+
+
+func _on_skill_node_unlock_requested(node_id: String) -> void:
+	progression_state = ClassProgressionStateScript.unlock_node(progression_state, node_id, player_xp)
+	_update_overlay()
+
+
+func _on_skill_family_equipped(skill_family: String, slot_index: int) -> void:
+	progression_state = ClassProgressionStateScript.equip_skill_family(progression_state, skill_family, slot_index, player_xp)
+	_update_overlay()
 
 
 func _get_bag_item_count(item_name: String) -> int:

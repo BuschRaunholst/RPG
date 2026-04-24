@@ -100,6 +100,7 @@ func _setup_fade_layer() -> void:
 
 func _setup_overlay() -> void:
 	overlay = OverlayScene.instantiate()
+	overlay.layer = 30
 	add_child(overlay)
 	_reset_overlay_contextual_state()
 
@@ -147,6 +148,11 @@ func set_overlay_inventory_state(bag_slots: Variant, equipment_slots: Variant, g
 func set_overlay_progression_state(level: int, unspent_points: int, allocations: Dictionary, attack_value: int, defense_value: int, max_health_value: int) -> void:
 	if overlay != null:
 		overlay.set_progression_state(level, unspent_points, allocations, attack_value, defense_value, max_health_value)
+
+
+func set_overlay_skills_state(progression_state: Variant, resolved_progression: Variant) -> void:
+	if overlay != null and overlay.has_method("set_skills_state"):
+		overlay.call("set_skills_state", progression_state, resolved_progression)
 
 
 func set_overlay_save_status(text: String) -> void:
@@ -237,6 +243,32 @@ func bind_overlay_stat_increase_requested(stat_callable: Callable) -> void:
 
 	if stat_callable.is_valid():
 		overlay.stat_increase_requested.connect(stat_callable)
+
+
+func bind_overlay_skill_node_unlock_requested(unlock_callable: Callable) -> void:
+	if overlay == null:
+		return
+
+	if unlock_callable.is_valid() and overlay.skill_node_unlock_requested.is_connected(unlock_callable):
+		overlay.skill_node_unlock_requested.disconnect(unlock_callable)
+
+	_disconnect_overlay_signal("skill_node_unlock_requested")
+
+	if unlock_callable.is_valid():
+		overlay.skill_node_unlock_requested.connect(unlock_callable)
+
+
+func bind_overlay_skill_family_equipped(equip_callable: Callable) -> void:
+	if overlay == null:
+		return
+
+	if equip_callable.is_valid() and overlay.skill_family_equipped.is_connected(equip_callable):
+		overlay.skill_family_equipped.disconnect(equip_callable)
+
+	_disconnect_overlay_signal("skill_family_equipped")
+
+	if equip_callable.is_valid():
+		overlay.skill_family_equipped.connect(equip_callable)
 
 
 func bind_overlay_menu_toggled(menu_callable: Callable) -> void:

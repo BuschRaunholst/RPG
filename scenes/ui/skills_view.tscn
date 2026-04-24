@@ -1,0 +1,172 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/skills_view.gd" id="1_skills"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_skills_surface"]
+bg_color = Color(0.0313726, 0.0392157, 0.0470588, 0.97)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.94902, 0.901961, 0.596078, 0.08)
+shadow_color = Color(0, 0, 0, 0.28)
+shadow_size = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_skills_panel"]
+bg_color = Color(0.0627451, 0.0784314, 0.0901961, 0.96)
+corner_radius_top_left = 18
+corner_radius_top_right = 18
+corner_radius_bottom_right = 18
+corner_radius_bottom_left = 18
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.94902, 0.901961, 0.596078, 0.11)
+
+[node name="SkillsView" type="Control"]
+custom_minimum_size = Vector2(0, 360)
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_skills")
+
+[node name="BackgroundPanel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_skills_surface")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 0
+theme_override_constants/margin_top = 58
+theme_override_constants/margin_right = 0
+theme_override_constants/margin_bottom = 0
+
+[node name="MainColumn" type="VBoxContainer" parent="MarginContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="HeaderRow" type="HBoxContainer" parent="MarginContainer/MainColumn"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ClassLabel" type="Label" parent="MarginContainer/MainColumn/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 20
+text = "Skills"
+
+[node name="PointsLabel" type="Label" parent="MarginContainer/MainColumn/HeaderRow"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Points: 0"
+horizontal_alignment = 2
+
+[node name="BodyRow" type="HBoxContainer" parent="MarginContainer/MainColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 0
+
+[node name="TreePanel" type="PanelContainer" parent="MarginContainer/MainColumn/BodyRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_styles/panel = SubResource("StyleBoxFlat_skills_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/MainColumn/BodyRow/TreePanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="TreeColumn" type="VBoxContainer" parent="MarginContainer/MainColumn/BodyRow/TreePanel/MarginContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="TreeScroll" type="Control" parent="MarginContainer/MainColumn/BodyRow/TreePanel/MarginContainer/TreeColumn"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+clip_contents = true
+
+[node name="GraphCanvas" type="Control" parent="MarginContainer/MainColumn/BodyRow/TreePanel/MarginContainer/TreeColumn/TreeScroll"]
+custom_minimum_size = Vector2(1200, 760)
+layout_mode = 2
+
+[node name="InfoPopup" type="PanelContainer" parent="."]
+visible = false
+offset_left = 690.0
+offset_top = 124.0
+offset_right = 1030.0
+offset_bottom = 460.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_skills_panel")
+
+[node name="MarginContainer" type="MarginContainer" parent="InfoPopup"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="DetailColumn" type="VBoxContainer" parent="InfoPopup/MarginContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+
+[node name="PopupHeader" type="HBoxContainer" parent="InfoPopup/MarginContainer/DetailColumn"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="NodeTitle" type="Label" parent="InfoPopup/MarginContainer/DetailColumn/PopupHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "Select a node"
+
+[node name="CloseButton" type="Button" parent="InfoPopup/MarginContainer/DetailColumn/PopupHeader"]
+custom_minimum_size = Vector2(34, 30)
+layout_mode = 2
+text = "X"
+
+[node name="NodeMeta" type="Label" parent="InfoPopup/MarginContainer/DetailColumn"]
+layout_mode = 2
+autowrap_mode = 3
+text = ""
+
+[node name="NodeBody" type="Label" parent="InfoPopup/MarginContainer/DetailColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+autowrap_mode = 3
+text = "Node details"
+
+[node name="ClusterLabel" type="Label" parent="InfoPopup/MarginContainer/DetailColumn"]
+layout_mode = 2
+autowrap_mode = 3
+text = ""
+
+[node name="ActionRow" type="HBoxContainer" parent="InfoPopup/MarginContainer/DetailColumn"]
+layout_mode = 2
+
+[node name="UnlockButton" type="Button" parent="InfoPopup/MarginContainer/DetailColumn/ActionRow"]
+custom_minimum_size = Vector2(0, 34)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Unlock Node"

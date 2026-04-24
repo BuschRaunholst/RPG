@@ -167,6 +167,34 @@ const ITEM_DATA := {
 			}
 		}
 	},
+	"Iron Greataxe": {
+		"equip_slot": "weapon",
+		"value": 38,
+		"stats": {
+			"attack": 11
+		},
+		"weapon": {
+			"weapon_type": "greataxe",
+			"hold_style": "greataxe",
+			"attack_kind": "melee_arc",
+			"range": 76.0,
+			"cooldown": 0.60,
+			"animation_duration": 0.18,
+			"arc_dot": -0.08,
+			"thickness": 28.0,
+			"targeting": "forward",
+			"max_targets": 3,
+			"damage_scale": 1.25,
+			"two_handed": true,
+			"ranged": false,
+			"visual_profile": {
+				"offset": Vector2(-8.0, -19.0),
+				"rotation_offsets": {
+					"default": 0.0
+				}
+			}
+		}
+	},
 	"Woodsman Axe": {
 		"equip_slot": "weapon",
 		"value": 26,
@@ -240,35 +268,89 @@ const MATERIAL_DATA := {
 		"value": 2
 	}
 }
-const DEFAULT_EQUIPMENT := {
-	"weapon": {
-		"name": "Traveler Knife",
-		"kind": "equipment",
-		"count": 1,
-		"equip_slot": "weapon"
+const CLASS_DEFAULT_EQUIPMENT := {
+	"rogue": {
+		"weapon": {
+			"name": "Hunter Bow",
+			"kind": "equipment",
+			"count": 1,
+			"equip_slot": "weapon"
+		},
+		"body": {
+			"name": "Village Tunic",
+			"kind": "equipment",
+			"count": 1,
+			"equip_slot": "body"
+		},
+		"boots": {
+			"name": "Worn Boots",
+			"kind": "equipment",
+			"count": 1,
+			"equip_slot": "boots"
+		}
 	},
-	"body": {
-		"name": "Village Tunic",
-		"kind": "equipment",
-		"count": 1,
-		"equip_slot": "body"
+	"mage": {
+		"weapon": {
+			"name": "Willow Wand",
+			"kind": "equipment",
+			"count": 1,
+			"equip_slot": "weapon"
+		},
+		"body": {
+			"name": "Village Tunic",
+			"kind": "equipment",
+			"count": 1,
+			"equip_slot": "body"
+		},
+		"boots": {
+			"name": "Worn Boots",
+			"kind": "equipment",
+			"count": 1,
+			"equip_slot": "boots"
+		}
 	},
-	"boots": {
-		"name": "Worn Boots",
-		"kind": "equipment",
-		"count": 1,
-		"equip_slot": "boots"
+	"fighter": {
+		"weapon": {
+			"name": "Woodsman Axe",
+			"kind": "equipment",
+			"count": 1,
+			"equip_slot": "weapon"
+		},
+		"body": {
+			"name": "Village Tunic",
+			"kind": "equipment",
+			"count": 1,
+			"equip_slot": "body"
+		},
+		"boots": {
+			"name": "Worn Boots",
+			"kind": "equipment",
+			"count": 1,
+			"equip_slot": "boots"
+		},
+		"offhand": {
+			"name": "Oak Buckler",
+			"kind": "equipment",
+			"count": 1,
+			"equip_slot": "offhand"
+		}
 	}
 }
-const DEFAULT_STARTING_BAG_ITEMS := [
-	{"name": "Trail Ration", "kind": "consumable", "count": 2},
-	{"name": "Oak Buckler", "kind": "equipment", "count": 1, "equip_slot": "offhand"},
-	{"name": "Hunter Bow", "kind": "equipment", "count": 1, "equip_slot": "weapon"},
-	{"name": "Ash Staff", "kind": "equipment", "count": 1, "equip_slot": "weapon"},
-	{"name": "Willow Wand", "kind": "equipment", "count": 1, "equip_slot": "weapon"},
-	{"name": "Iron Greatsword", "kind": "equipment", "count": 1, "equip_slot": "weapon"},
-	{"name": "Woodsman Axe", "kind": "equipment", "count": 1, "equip_slot": "weapon"}
-]
+const CLASS_DEFAULT_STARTING_BAG_ITEMS := {
+	"rogue": [
+		{"name": "Trail Ration", "kind": "consumable", "count": 2},
+		{"name": "Traveler Knife", "kind": "equipment", "count": 1, "equip_slot": "weapon"}
+	],
+	"mage": [
+		{"name": "Trail Ration", "kind": "consumable", "count": 2},
+		{"name": "Ash Staff", "kind": "equipment", "count": 1, "equip_slot": "weapon"}
+	],
+	"fighter": [
+		{"name": "Trail Ration", "kind": "consumable", "count": 2},
+		{"name": "Iron Greatsword", "kind": "equipment", "count": 1, "equip_slot": "weapon"},
+		{"name": "Iron Greataxe", "kind": "equipment", "count": 1, "equip_slot": "weapon"}
+	]
+}
 
 
 static func create_empty_bag() -> Array[Dictionary]:
@@ -280,9 +362,10 @@ static func create_empty_bag() -> Array[Dictionary]:
 	return bag
 
 
-static func create_default_bag() -> Array[Dictionary]:
+static func create_default_bag_for_class(class_id: String) -> Array[Dictionary]:
 	var bag: Array[Dictionary] = create_empty_bag()
-	for item_data in DEFAULT_STARTING_BAG_ITEMS:
+	var starter_items: Array = CLASS_DEFAULT_STARTING_BAG_ITEMS.get(class_id, CLASS_DEFAULT_STARTING_BAG_ITEMS.get("rogue", []))
+	for item_data in starter_items:
 		add_item(
 			bag,
 			str(item_data.get("name", "")),
@@ -293,18 +376,30 @@ static func create_default_bag() -> Array[Dictionary]:
 	return bag
 
 
-static func create_default_equipment() -> Dictionary:
+static func create_default_bag() -> Array[Dictionary]:
+	return create_default_bag_for_class("rogue")
+
+
+static func create_default_equipment_for_class(class_id: String) -> Dictionary:
 	var equipment: Dictionary = {}
 	for slot_name in EQUIPMENT_SLOT_ORDER:
 		equipment[slot_name] = {}
-	return _apply_default_equipment(equipment)
+	return _apply_default_equipment_for_class(equipment, class_id)
+
+
+static func create_default_equipment() -> Dictionary:
+	return create_default_equipment_for_class("rogue")
+
+
+static func create_default_starting_state_for_class(class_id: String) -> Dictionary:
+	return {
+		"bag_slots": create_default_bag_for_class(class_id),
+		"equipment_slots": create_default_equipment_for_class(class_id)
+	}
 
 
 static func create_default_starting_state() -> Dictionary:
-	return {
-		"bag_slots": create_default_bag(),
-		"equipment_slots": create_default_equipment()
-	}
+	return create_default_starting_state_for_class("rogue")
 
 
 static func normalize_bag(raw_value: Variant) -> Array[Dictionary]:
@@ -673,8 +768,9 @@ static func _find_matching_stack(bag_slots: Array[Dictionary], item_name: String
 	return -1
 
 
-static func _apply_default_equipment(equipment: Dictionary) -> Dictionary:
-	for slot_name in DEFAULT_EQUIPMENT.keys():
-		equipment[slot_name] = normalize_item(DEFAULT_EQUIPMENT[slot_name])
+static func _apply_default_equipment_for_class(equipment: Dictionary, class_id: String) -> Dictionary:
+	var starter_equipment: Dictionary = CLASS_DEFAULT_EQUIPMENT.get(class_id, CLASS_DEFAULT_EQUIPMENT.get("rogue", {}))
+	for slot_name in starter_equipment.keys():
+		equipment[slot_name] = normalize_item(starter_equipment[slot_name])
 
 	return equipment

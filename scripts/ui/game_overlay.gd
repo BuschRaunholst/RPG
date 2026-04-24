@@ -6,6 +6,8 @@ signal inventory_changed(bag_slots: Array, equipment_slots: Dictionary)
 signal use_item_requested(item_name: String)
 signal quick_item_assigned(item_name: String, item_kind: String)
 signal stat_increase_requested(stat_name: String)
+signal skill_node_unlock_requested(node_id: String)
+signal skill_family_equipped(skill_family: String, slot_index: int)
 signal menu_toggled(is_open: bool)
 signal tracked_quest_toggled(quest_id: String)
 
@@ -29,6 +31,7 @@ const MINIMAP_RESERVED_WIDTH := 214.0
 @onready var quest_menu_button: Button = $TopMenuBar/QuestMenuButton
 @onready var player_menu_button: Button = $TopMenuBar/PlayerMenuButton
 @onready var inventory_menu_button: Button = $TopMenuBar/InventoryMenuButton
+@onready var skills_menu_button: Button = $TopMenuBar/SkillsMenuButton
 @onready var save_menu_button: Button = $TopMenuBar/SaveMenuButton
 @onready var tracked_quest_panel: PanelContainer = $TrackedQuestPanel
 @onready var tracked_quest_title_label: Label = $TrackedQuestPanel/MarginContainer/VBoxContainer/TrackedQuestTitle
@@ -42,6 +45,7 @@ const MINIMAP_RESERVED_WIDTH := 214.0
 @onready var player_window: MarginContainer = $MenuPanel/MarginContainer/VBoxContainer/Pages/CharacterPages/PlayerWindow
 @onready var character_spacer: Control = $MenuPanel/MarginContainer/VBoxContainer/Pages/CharacterPages/CharacterSpacer
 @onready var inventory_window: MarginContainer = $MenuPanel/MarginContainer/VBoxContainer/Pages/CharacterPages/InventoryWindow
+@onready var skills_page: VBoxContainer = $MenuPanel/MarginContainer/VBoxContainer/Pages/SkillsPage
 @onready var save_page: VBoxContainer = $MenuPanel/MarginContainer/VBoxContainer/Pages/SavePage
 @onready var quest_list: ItemList = $MenuPanel/MarginContainer/VBoxContainer/Pages/QuestPage/QuestContent/QuestListPanel/MarginContainer/QuestList
 @onready var quest_title_label: Label = $MenuPanel/MarginContainer/VBoxContainer/Pages/QuestPage/QuestContent/QuestDetailPanel/MarginContainer/VBoxContainer/QuestTitle
@@ -50,6 +54,7 @@ const MINIMAP_RESERVED_WIDTH := 214.0
 @onready var track_quest_button: Button = $MenuPanel/MarginContainer/VBoxContainer/Pages/QuestPage/QuestContent/QuestDetailPanel/MarginContainer/VBoxContainer/TrackQuestButton
 @onready var player_view: Node = $MenuPanel/MarginContainer/VBoxContainer/Pages/CharacterPages/PlayerWindow/PlayerView
 @onready var inventory_view: Node = $MenuPanel/MarginContainer/VBoxContainer/Pages/CharacterPages/InventoryWindow/InventoryView
+@onready var skills_view: Node = $MenuPanel/MarginContainer/VBoxContainer/Pages/SkillsPage/SkillsView
 @onready var save_status_label: Label = $MenuPanel/MarginContainer/VBoxContainer/Pages/SavePage/SaveStatus
 @onready var save_button: Button = $MenuPanel/MarginContainer/VBoxContainer/Pages/SavePage/ButtonRow/SaveButton
 @onready var load_button: Button = $MenuPanel/MarginContainer/VBoxContainer/Pages/SavePage/ButtonRow/LoadButton
@@ -65,6 +70,7 @@ var tracked_quest_ids: Array[String] = []
 var current_quest_filter: String = "active"
 var default_menu_panel_style: StyleBox
 var empty_menu_panel_style := StyleBoxEmpty.new()
+var dungeon_map_requested_visible: bool = false
 
 
 func _ready() -> void:
@@ -72,6 +78,7 @@ func _ready() -> void:
 	quest_menu_button.pressed.connect(_on_quest_menu_button_pressed)
 	player_menu_button.pressed.connect(_on_player_menu_button_pressed)
 	inventory_menu_button.pressed.connect(_on_inventory_menu_button_pressed)
+	skills_menu_button.pressed.connect(_on_skills_menu_button_pressed)
 	save_menu_button.pressed.connect(_on_save_menu_button_pressed)
 	save_button.pressed.connect(_on_save_button_pressed)
 	load_button.pressed.connect(_on_load_button_pressed)
@@ -89,6 +96,10 @@ func _ready() -> void:
 		inventory_view.connect("use_item_requested", Callable(self, "_on_inventory_use_requested"))
 	if inventory_view.has_signal("quick_item_assigned"):
 		inventory_view.connect("quick_item_assigned", Callable(self, "_on_quick_item_assigned"))
+	if skills_view.has_signal("unlock_node_requested"):
+		skills_view.connect("unlock_node_requested", Callable(self, "_on_skill_node_unlock_requested"))
+	if skills_view.has_signal("equip_skill_requested"):
+		skills_view.connect("equip_skill_requested", Callable(self, "_on_skill_family_equipped"))
 	menu_dimmer.gui_input.connect(_on_menu_dimmer_gui_input)
 	combat_label.modulate.a = 0.0
 	menu_dimmer.visible = false
@@ -96,10 +107,12 @@ func _ready() -> void:
 	player_window.visible = false
 	character_spacer.visible = false
 	inventory_window.visible = false
+	skills_page.visible = false
 	if not get_viewport().size_changed.is_connected(_on_viewport_size_changed):
 		get_viewport().size_changed.connect(_on_viewport_size_changed)
 	_show_menu_tab(current_tab)
 	_update_top_menu_buttons()
+	_update_overlay_chrome_visibility()
 	call_deferred("_apply_responsive_layout")
 
 
@@ -146,6 +159,13 @@ func set_inventory_state(bag_slots: Variant, equipment_slots: Variant, gold_amou
 func set_progression_state(level: int, unspent_points: int, allocations: Dictionary, attack_value: int, defense_value: int, max_health_value: int) -> void:
 	if player_view.has_method("set_progression_state"):
 		player_view.call("set_progression_state", level, unspent_points, allocations, attack_value, defense_value, max_health_value)
+	if inventory_view.has_method("set_progression_state"):
+		inventory_view.call("set_progression_state", level, unspent_points, allocations, attack_value, defense_value, max_health_value)
+
+
+func set_skills_state(progression_state: Variant, resolved_progression: Variant) -> void:
+	if skills_view.has_method("set_skills_state"):
+		skills_view.call("set_skills_state", progression_state, resolved_progression)
 
 
 func set_save_status(text: String) -> void:
@@ -155,6 +175,9 @@ func set_save_status(text: String) -> void:
 func set_dungeon_map_state(map_data: Dictionary) -> void:
 	if dungeon_map != null and dungeon_map.has_method("set_map_state"):
 		dungeon_map.call("set_map_state", map_data)
+	dungeon_map_requested_visible = bool(map_data.get("enabled", false))
+	if dungeon_map != null:
+		dungeon_map.visible = dungeon_map_requested_visible and not (menu_panel.visible and current_tab == "skills")
 	_apply_responsive_layout()
 
 
@@ -192,6 +215,7 @@ func set_menu_locked(value: bool) -> void:
 	quest_menu_button.disabled = menu_locked
 	player_menu_button.disabled = menu_locked
 	inventory_menu_button.disabled = menu_locked
+	skills_menu_button.disabled = menu_locked
 	save_menu_button.disabled = menu_locked
 
 
@@ -245,12 +269,24 @@ func _on_stat_increase_requested(stat_name: String) -> void:
 	stat_increase_requested.emit(stat_name)
 
 
+func _on_skill_node_unlock_requested(node_id: String) -> void:
+	skill_node_unlock_requested.emit(node_id)
+
+
+func _on_skill_family_equipped(skill_family: String, slot_index: int) -> void:
+	skill_family_equipped.emit(skill_family, slot_index)
+
+
 func _on_quest_menu_button_pressed() -> void:
 	_toggle_menu_tab("quest")
 
 
 func _on_inventory_menu_button_pressed() -> void:
 	_toggle_inventory_window()
+
+
+func _on_skills_menu_button_pressed() -> void:
+	_toggle_menu_tab("skills")
 
 
 func _on_player_menu_button_pressed() -> void:
@@ -307,13 +343,15 @@ func _show_menu_tab(tab_name: String) -> void:
 	current_tab = tab_name
 	quest_page.visible = tab_name == "quest"
 	character_pages.visible = tab_name == "character" and (player_window.visible or inventory_window.visible)
+	skills_page.visible = tab_name == "skills"
 	save_page.visible = tab_name == "save"
-	if tab_name == "character":
+	if tab_name == "character" or tab_name == "skills":
 		menu_panel.add_theme_stylebox_override("panel", empty_menu_panel_style)
 	else:
 		menu_panel.add_theme_stylebox_override("panel", default_menu_panel_style)
 	_apply_menu_layout(tab_name)
 	_update_top_menu_buttons()
+	_update_overlay_chrome_visibility()
 
 
 func _open_menu_for_tab(tab_name: String) -> void:
@@ -328,6 +366,7 @@ func _set_menu_open(is_open: bool) -> void:
 	menu_panel.visible = is_open
 	menu_dimmer.visible = is_open
 	_update_top_menu_buttons()
+	_update_overlay_chrome_visibility()
 
 	if state_changed:
 		menu_toggled.emit(is_open)
@@ -349,6 +388,7 @@ func _toggle_player_window() -> void:
 		return
 
 	player_window.visible = not player_window.visible
+	skills_page.visible = false
 	current_tab = "character"
 	_refresh_character_pages()
 	_show_menu_tab("character")
@@ -360,6 +400,7 @@ func _toggle_inventory_window() -> void:
 		return
 
 	inventory_window.visible = not inventory_window.visible
+	skills_page.visible = false
 	current_tab = "character"
 	_refresh_character_pages()
 	_show_menu_tab("character")
@@ -395,10 +436,11 @@ func _refresh_character_pages() -> void:
 
 func _update_menu_open_state() -> void:
 	var was_open: bool = _is_any_menu_open()
-	var any_open: bool = quest_page.visible or save_page.visible or player_window.visible or inventory_window.visible
+	var any_open: bool = quest_page.visible or save_page.visible or skills_page.visible or player_window.visible or inventory_window.visible
 	menu_panel.visible = any_open
 	menu_dimmer.visible = any_open
 	_update_top_menu_buttons()
+	_update_overlay_chrome_visibility()
 	if was_open != any_open:
 		menu_toggled.emit(any_open)
 
@@ -410,14 +452,16 @@ func _close_all_menus() -> void:
 	character_spacer.visible = false
 	inventory_window.visible = false
 	character_pages.visible = false
+	skills_page.visible = false
 	menu_dimmer.visible = false
 	_update_top_menu_buttons()
+	_update_overlay_chrome_visibility()
 	if was_open:
 		menu_toggled.emit(false)
 
 
 func _is_any_menu_open() -> bool:
-	return menu_panel.visible or player_window.visible or inventory_window.visible
+	return menu_panel.visible or player_window.visible or inventory_window.visible or skills_page.visible
 
 
 func _on_viewport_size_changed() -> void:
@@ -438,11 +482,11 @@ func _apply_responsive_layout() -> void:
 	var vitals_height: float = 54.0
 	var center_x: float = viewport_size.x * 0.5
 
-	for button in [quest_menu_button, player_menu_button, inventory_menu_button, save_menu_button]:
+	for button in [quest_menu_button, player_menu_button, inventory_menu_button, skills_menu_button, save_menu_button]:
 		button.custom_minimum_size = Vector2(top_button_width, top_button_height)
 		button.add_theme_font_size_override("font_size", top_button_font_size)
 
-	var top_menu_width: float = top_button_width * 4.0 + HUD_GAP * 3.0
+	var top_menu_width: float = top_button_width * 5.0 + HUD_GAP * 4.0
 	top_menu_bar.anchor_left = 1.0
 	top_menu_bar.anchor_right = 1.0
 	top_menu_bar.offset_left = -side_margin - top_menu_width
@@ -504,11 +548,16 @@ func _apply_menu_layout(tab_name: String) -> void:
 	menu_panel.anchor_right = 1.0
 	menu_panel.anchor_bottom = 1.0
 
+	var is_skills: bool = tab_name == "skills"
 	var side_margin: float = 14.0 if compact else (62.0 if tab_name == "character" else 48.0)
 	var top_margin: float = 84.0 if compact else (92.0 if tab_name == "character" else 88.0)
 	var bottom_margin: float = 14.0 if compact else 24.0
 	if compact and tab_name == "character":
 		top_margin = 90.0
+	if is_skills:
+		side_margin = 0.0
+		top_margin = 0.0
+		bottom_margin = 0.0
 
 	menu_panel.offset_left = side_margin
 	menu_panel.offset_top = top_margin
@@ -520,11 +569,23 @@ func _update_top_menu_buttons() -> void:
 	_set_top_button_state(quest_menu_button, menu_panel.visible and current_tab == "quest")
 	_set_top_button_state(player_menu_button, player_window.visible)
 	_set_top_button_state(inventory_menu_button, inventory_window.visible)
+	_set_top_button_state(skills_menu_button, menu_panel.visible and current_tab == "skills")
 	_set_top_button_state(save_menu_button, menu_panel.visible and current_tab == "save")
 
 
 func _set_top_button_state(button: Button, is_active: bool) -> void:
 	button.modulate = Color(1.0, 1.0, 1.0, 1.0) if is_active else Color(0.84, 0.9, 0.82, 0.88)
+
+
+func _update_overlay_chrome_visibility() -> void:
+	var skills_open: bool = menu_panel.visible and current_tab == "skills"
+	vitals_panel.visible = not skills_open
+	location_label.visible = not skills_open
+	combat_label.visible = not skills_open
+	tracked_quest_panel.visible = not skills_open
+	menu_dimmer.color = Color(0.0117647, 0.0196078, 0.0235294, 0.78) if skills_open else Color(0.0117647, 0.0196078, 0.0235294, 0.4)
+	if dungeon_map != null:
+		dungeon_map.visible = dungeon_map_requested_visible and not skills_open
 
 
 func _refresh_quest_journal() -> void:

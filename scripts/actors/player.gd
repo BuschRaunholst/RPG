@@ -323,6 +323,7 @@ func _build_weapon_textures() -> void:
 	weapon_textures["Ash Staff"] = _create_staff_texture()
 	weapon_textures["Willow Wand"] = _create_wand_texture()
 	weapon_textures["Iron Greatsword"] = _create_greatsword_texture()
+	weapon_textures["Iron Greataxe"] = _create_greataxe_texture()
 	weapon_textures["Woodsman Axe"] = _create_axe_texture()
 
 
@@ -478,8 +479,8 @@ func _get_weapon_rotation_profile(style: String, direction_name: String) -> Dict
 			return _bow_rotation_profile(direction_name)
 		"staff":
 			return _staff_vertical_rotation_profile()
-		"greatsword":
-			return _heavy_swing_rotation_profile(direction_name)
+		"greatsword", "greataxe":
+			return _heavy_front_carry_rotation_profile(direction_name)
 		"wand":
 			return _short_blade_rotation_profile(direction_name)
 		"axe":
@@ -511,16 +512,16 @@ func _short_blade_rotation_profile(direction_name: String) -> Dictionary:
 			return {"idle": 210.0, "windup": 246.0, "strike": 174.0, "recover": 210.0}
 
 
-func _heavy_swing_rotation_profile(direction_name: String) -> Dictionary:
+func _heavy_front_carry_rotation_profile(direction_name: String) -> Dictionary:
 	match direction_name:
 		"left":
-			return {"idle": -90.0, "windup": -26.0, "strike": -152.0, "recover": -96.0}
+			return {"idle": -8.0, "windup": -14.0, "strike": -4.0, "recover": -8.0}
 		"right":
-			return {"idle": 90.0, "windup": 26.0, "strike": 152.0, "recover": 96.0}
+			return {"idle": 8.0, "windup": 14.0, "strike": 4.0, "recover": 8.0}
 		"up":
-			return {"idle": 0.0, "windup": 58.0, "strike": -48.0, "recover": 4.0}
+			return {"idle": -24.0, "windup": -30.0, "strike": -18.0, "recover": -24.0}
 		_:
-			return {"idle": 180.0, "windup": 238.0, "strike": 128.0, "recover": 176.0}
+			return {"idle": 18.0, "windup": 24.0, "strike": 12.0, "recover": 18.0}
 
 
 func _staff_vertical_rotation_profile() -> Dictionary:
@@ -567,6 +568,8 @@ func _get_pose_set(style: String, direction_name: String) -> Dictionary:
 			return _get_staff_pose_set(direction_name)
 		"greatsword":
 			return _get_greatsword_pose_set(direction_name)
+		"greataxe":
+			return _get_greataxe_pose_set(direction_name)
 		"wand":
 			return _get_wand_pose_set(direction_name)
 		"axe":
@@ -634,7 +637,7 @@ func _get_direction_rig(direction_name: String) -> Dictionary:
 func _apply_pose_layer_defaults(pose: Dictionary, style: String, direction_name: String) -> Dictionary:
 	var layered_pose: Dictionary = pose.duplicate(true)
 	var has_left_grip: bool = layered_pose.get("left_hand_grip", null) is Vector2
-	var is_two_hand_style: bool = style in ["bow", "greatsword"]
+	var is_two_hand_style: bool = style in ["bow", "greatsword", "greataxe"]
 	var default_show_left: bool = has_left_grip
 	var default_show_right: bool = true
 	var defaults := {}
@@ -762,10 +765,10 @@ func _get_staff_pose_set(direction_name: String) -> Dictionary:
 			}
 		"right":
 			return {
-				"idle": _pose(Vector2(18.0, -15.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"windup": _pose(Vector2(20.0, -15.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"strike": _pose(Vector2(23.0, -15.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 6, "right_arm_z": 6}),
-				"recover": _pose(Vector2(18.0, -15.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 6, "right_arm_z": 6})
+				"idle": _pose(Vector2(18.0, -17.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 5, "right_arm_z": 6}),
+				"windup": _pose(Vector2(20.0, -17.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 5, "right_arm_z": 6}),
+				"strike": _pose(Vector2(23.0, -17.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 5, "right_arm_z": 6}),
+				"recover": _pose(Vector2(18.0, -17.0), 90.0, Vector2(6.0, 19.0), null, {"weapon_z": 5, "right_arm_z": 6})
 			}
 		"up":
 			return {
@@ -784,34 +787,45 @@ func _get_staff_pose_set(direction_name: String) -> Dictionary:
 
 
 func _get_greatsword_pose_set(direction_name: String) -> Dictionary:
+	return _get_two_hand_front_pose_set(direction_name, false)
+
+
+func _get_greataxe_pose_set(direction_name: String) -> Dictionary:
+	return _get_two_hand_front_pose_set(direction_name, true)
+
+
+func _get_two_hand_front_pose_set(direction_name: String, is_greataxe: bool) -> Dictionary:
+	var weapon_y: float = -11.0 if is_greataxe else -9.0
+	var right_grip: Vector2 = Vector2(7.0, 37.0) if is_greataxe else Vector2(7.0, 39.0)
+	var left_grip: Vector2 = Vector2(7.0, 33.0) if is_greataxe else Vector2(7.0, 35.0)
 	match direction_name:
 		"left":
 			return {
-				"idle": _pose(Vector2(3.0, -10.0), 164.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"windup": _pose(Vector2(6.0, -12.0), 236.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"strike": _pose(Vector2(-2.0, -7.0), 94.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"recover": _pose(Vector2(1.0, -9.0), 142.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0))
+				"idle": _pose(Vector2(-12.0, weapon_y - 13.0), -8.0, right_grip, left_grip, {"weapon_z": 1, "left_arm_z": 6, "right_arm_z": 1, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84, "left_shoulder_offset": Vector2(2.0, 0.0)}),
+				"windup": _pose(Vector2(-13.0, weapon_y - 14.0), -14.0, right_grip, left_grip, {"weapon_z": 1, "left_arm_z": 6, "right_arm_z": 1, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84, "left_shoulder_offset": Vector2(2.0, 0.0)}),
+				"strike": _pose(Vector2(-11.0, weapon_y - 12.0), -4.0, right_grip, left_grip, {"weapon_z": 1, "left_arm_z": 6, "right_arm_z": 1, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84, "left_shoulder_offset": Vector2(2.0, 0.0)}),
+				"recover": _pose(Vector2(-12.0, weapon_y - 13.0), -8.0, right_grip, left_grip, {"weapon_z": 1, "left_arm_z": 6, "right_arm_z": 1, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84, "left_shoulder_offset": Vector2(2.0, 0.0)})
 			}
 		"right":
 			return {
-				"idle": _pose(Vector2(-3.0, -10.0), 16.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"windup": _pose(Vector2(-6.0, -12.0), -56.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"strike": _pose(Vector2(2.0, -7.0), 86.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"recover": _pose(Vector2(-1.0, -9.0), 38.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0))
+				"idle": _pose(Vector2(13.0, weapon_y - 13.0), 8.0, right_grip, left_grip, {"weapon_z": 6, "left_arm_z": 6, "right_arm_z": 6, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84}),
+				"windup": _pose(Vector2(12.0, weapon_y - 14.0), 14.0, right_grip, left_grip, {"weapon_z": 6, "left_arm_z": 6, "right_arm_z": 6, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84}),
+				"strike": _pose(Vector2(14.0, weapon_y - 12.0), 4.0, right_grip, left_grip, {"weapon_z": 6, "left_arm_z": 6, "right_arm_z": 6, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84}),
+				"recover": _pose(Vector2(13.0, weapon_y - 13.0), 8.0, right_grip, left_grip, {"weapon_z": 6, "left_arm_z": 6, "right_arm_z": 6, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84})
 			}
 		"up":
 			return {
-				"idle": _pose(Vector2(0.0, -12.0), -14.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"windup": _pose(Vector2(2.0, -14.0), -64.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"strike": _pose(Vector2(-1.0, -9.0), 10.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"recover": _pose(Vector2(0.0, -11.0), -18.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0))
+				"idle": _pose(Vector2(-3.0, weapon_y - 18.0), -24.0, right_grip, left_grip, {"weapon_z": 1, "left_arm_z": 1, "right_arm_z": 1, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84, "left_shoulder_offset": Vector2(1.0, -2.0), "right_shoulder_offset": Vector2(-5.0, -2.0)}),
+				"windup": _pose(Vector2(-3.0, weapon_y - 19.0), -30.0, right_grip, left_grip, {"weapon_z": 1, "left_arm_z": 1, "right_arm_z": 1, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84, "left_shoulder_offset": Vector2(1.0, -2.0), "right_shoulder_offset": Vector2(-5.0, -2.0)}),
+				"strike": _pose(Vector2(-2.0, weapon_y - 17.0), -18.0, right_grip, left_grip, {"weapon_z": 1, "left_arm_z": 1, "right_arm_z": 1, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84, "left_shoulder_offset": Vector2(1.0, -2.0), "right_shoulder_offset": Vector2(-5.0, -2.0)}),
+				"recover": _pose(Vector2(-3.0, weapon_y - 18.0), -24.0, right_grip, left_grip, {"weapon_z": 1, "left_arm_z": 1, "right_arm_z": 1, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84, "left_shoulder_offset": Vector2(1.0, -2.0), "right_shoulder_offset": Vector2(-5.0, -2.0)})
 			}
 		_:
 			return {
-				"idle": _pose(Vector2(0.0, -2.0), 186.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"windup": _pose(Vector2(0.0, -5.0), 252.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"strike": _pose(Vector2(0.0, 1.0), 138.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0)),
-				"recover": _pose(Vector2(0.0, -1.0), 174.0, Vector2(7.0, 29.0), Vector2(7.0, 23.0))
+				"idle": _pose(Vector2(2.0, weapon_y - 10.0), 18.0, right_grip, left_grip, {"weapon_z": 6, "left_arm_z": 6, "right_arm_z": 6, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84}),
+				"windup": _pose(Vector2(2.0, weapon_y - 11.0), 24.0, right_grip, left_grip, {"weapon_z": 6, "left_arm_z": 6, "right_arm_z": 6, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84}),
+				"strike": _pose(Vector2(3.0, weapon_y - 9.0), 12.0, right_grip, left_grip, {"weapon_z": 6, "left_arm_z": 6, "right_arm_z": 6, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84}),
+				"recover": _pose(Vector2(2.0, weapon_y - 10.0), 18.0, right_grip, left_grip, {"weapon_z": 6, "left_arm_z": 6, "right_arm_z": 6, "left_arm_scale_y": 0.84, "right_arm_scale_y": 0.84})
 			}
 
 
@@ -995,6 +1009,8 @@ func _get_legacy_weapon_offset(weapon_name: String) -> Vector2:
 	match weapon_name:
 		"Hunter Bow", "Iron Greatsword":
 			return Vector2(-6.0, -17.0)
+		"Iron Greataxe":
+			return Vector2(-8.0, -19.0)
 		"Ash Staff":
 			return Vector2(-6.0, -19.0)
 		_:
@@ -1138,19 +1154,19 @@ func _create_wand_texture() -> Texture2D:
 
 
 func _create_greatsword_texture() -> Texture2D:
-	var image: Image = Image.create(14, 38, false, Image.FORMAT_RGBA8)
+	var image: Image = Image.create(14, 42, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0.0, 0.0, 0.0, 0.0))
 	var outline: Color = Color(0.04, 0.03, 0.025, 1.0)
 	var steel_dark: Color = Color(0.46, 0.47, 0.50, 1.0)
 	var steel: Color = Color(0.79, 0.83, 0.80, 1.0)
 	var leather: Color = Color(0.25, 0.15, 0.08, 1.0)
-	image.fill_rect(Rect2i(4, 0, 6, 22), outline)
-	image.fill_rect(Rect2i(5, 1, 4, 20), steel_dark)
-	image.fill_rect(Rect2i(6, 1, 2, 18), steel)
-	image.fill_rect(Rect2i(2, 22, 10, 3), outline)
-	image.fill_rect(Rect2i(3, 23, 8, 1), steel_dark)
-	image.fill_rect(Rect2i(5, 25, 4, 10), outline)
-	image.fill_rect(Rect2i(6, 26, 2, 8), leather)
+	image.fill_rect(Rect2i(4, 0, 6, 26), outline)
+	image.fill_rect(Rect2i(5, 1, 4, 24), steel_dark)
+	image.fill_rect(Rect2i(6, 1, 2, 22), steel)
+	image.fill_rect(Rect2i(2, 26, 10, 3), outline)
+	image.fill_rect(Rect2i(3, 27, 8, 1), steel_dark)
+	image.fill_rect(Rect2i(5, 29, 4, 10), outline)
+	image.fill_rect(Rect2i(6, 30, 2, 8), leather)
 	return ImageTexture.create_from_image(image)
 
 
@@ -1165,6 +1181,27 @@ func _create_axe_texture() -> Texture2D:
 	image.fill_rect(Rect2i(14, 2, 8, 10), outline)
 	image.fill_rect(Rect2i(15, 3, 5, 8), steel)
 	image.fill_rect(Rect2i(20, 5, 2, 4), steel)
+	return ImageTexture.create_from_image(image)
+
+
+func _create_greataxe_texture() -> Texture2D:
+	var image: Image = Image.create(16, 42, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.0, 0.0, 0.0, 0.0))
+	var outline: Color = Color(0.04, 0.03, 0.025, 1.0)
+	var wood: Color = Color(0.43, 0.25, 0.12, 1.0)
+	var wood_light: Color = Color(0.56, 0.34, 0.17, 1.0)
+	var steel_dark: Color = Color(0.42, 0.46, 0.49, 1.0)
+	var steel: Color = Color(0.74, 0.78, 0.80, 1.0)
+	image.fill_rect(Rect2i(6, 4, 4, 35), outline)
+	image.fill_rect(Rect2i(7, 5, 2, 33), wood)
+	image.fill_rect(Rect2i(7, 12, 1, 20), wood_light)
+	image.fill_rect(Rect2i(1, 1, 11, 12), outline)
+	image.fill_rect(Rect2i(2, 2, 8, 9), steel_dark)
+	image.fill_rect(Rect2i(3, 3, 5, 7), steel)
+	image.fill_rect(Rect2i(10, 3, 3, 8), outline)
+	image.fill_rect(Rect2i(10, 4, 2, 6), steel_dark)
+	image.fill_rect(Rect2i(5, 35, 6, 4), outline)
+	image.fill_rect(Rect2i(6, 36, 4, 2), steel_dark)
 	return ImageTexture.create_from_image(image)
 
 
